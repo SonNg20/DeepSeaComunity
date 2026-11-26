@@ -1,10 +1,10 @@
 -- ============================================================================
--- PS99 ULTIMATE OPTIMIZER - PUMPKINTYCOON (AUTO HUNT + FARM BREAKABLES + HATCH)
+-- PS99 OPTIMIZER - PUMPKINTYCOON EVENT (AUTO HUNT + TELEPORT NHIỀU)
 -- 1. POTATO MODE + ENGINE / FPS / LIGHTING / TERRAIN / SOUND / COREGUI
--- 2. XÓA SẠCH 100% HIỆU ỨNG (PARTICLE, CONFETTI, LIGHT, BILLBOARDGUI, EMIT)
--- 3. ẨN MAP / TYCOONS / PLOTS / PET / BREAKABLE (GIỮ SÀN, CANTOUCH & FARM)
+-- 2. XÓA SẠCH HIỆU ỨNG (PARTICLE, CONFETTI, LIGHT, BILLBOARDGUI, EMIT)
+-- 3. ẨN MAP / TYCOONS / PLOTS / PET (GIỮ CANCOLLIDE & CANTOUCH ĐỂ TELE HUNT)
 -- 4. AUTO COLLECT & HIDE ORB / LOOTBAG (CHUẨN ORBCMDS)
--- 5. TẮT PUMPKINFX, TURKEYFX, PROCESSSERIALFX & DỌN RAM ĐỊNH KỲ
+-- 5. TẮT PUMPKINFX, TURKEYFX, PROCESSSERIALFX & DỌN RAM (GIỮ LOGIC HUNT)
 -- ============================================================================
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,6 +13,7 @@ local Lighting = game:GetService("Lighting")
 local SoundService = game:GetService("SoundService")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
+
 if not game:IsLoaded() then
     pcall(function() game.Loaded:Wait() end)
 end
@@ -20,44 +21,51 @@ while not Players.LocalPlayer do
     task.wait(0.1)
 end
 local LocalPlayer = Players.LocalPlayer
+
 local env = (type(getgenv) == "function" and getgenv()) or _G
 if type(env._PS99PumpkinOptStop) == "function" then
     pcall(env._PS99PumpkinOptStop)
 end
+
 local Config = {
     Running = true,
+
     -- 1. Tối ưu có sẵn & Engine / FPS
     EnableGamePotatoMode = true,
-    TargetFPS = 15,                    -- Khuyên dùng 15-20 khi Auto Hunt tele liên tục (0 = không giới hạn)
+    TargetFPS = 20,                    -- Khuyên dùng 20-30 khi Auto Hunt tele liên tục (0 = không giới hạn)
     LowestRenderQuality = true,
-    Disable3DRendering = false,        -- Đổi thành true nếu treo ẩn -> giảm RAM/CPU/GPU mạnh nhất khi tele
+    Disable3DRendering = false,        -- true = tắt render 3D hoàn toàn (tiết kiệm GPU/CPU/RAM tối đa)
     OptimizeLightingAndTerrain = true,
     MuteAllSounds = true,
     HideDefaultCoreGui = true,         -- Tắt Chat, PlayerList, Backpack, Emotes & xóa ExperienceChat
-    -- 2. Ẩn hình ảnh & Xóa hiệu ứng (Vẫn farm & tele Hunt bình thường)
+
+    -- 2. Ẩn hình ảnh & Xóa hiệu ứng (Vẫn giữ sàn, pad, hunt target)
     HideMapAndTycoons = true,          -- Ẩn Map/Tycoons/Plots (GIỮ CanCollide & CanTouch để tele không rơi/lỗi pad)
-    HidePets = true,                   -- Ẩn model Pet (vẫn chạy & farm bình thường)
-    HideBreakables = true,             -- Ẩn model Breakable (KHÔNG Destroy -> vẫn farm bình thường)
+    HidePets = true,                   -- Ẩn model Pet (vẫn chạy & bắt/đánh bình thường)
     StripOtherPlayers = true,          -- Dọn phụ kiện, animation & ẩn nhân vật người chơi khác
-    BlockAllEffects = true,            -- Xóa sạch ParticleEmitter, Confetti, Light, BillboardGui, Emit
-    -- 3. Dọn RAM (GIỮ NGUYÊN PumpkinTycoonSections*, Hunt, Plots, Tycoons, __INSTANCE_CONTAINER)
+    BlockAllEffects = true,            -- Xóa ParticleEmitter, Beam, Trail, Light, BillboardGui, Emit
+
+    -- 3. Dọn RAM (KHÔNG xóa PumpkinTycoonSections, Hunt, Plots, Tycoons, __INSTANCE_CONTAINER)
     ClearDebrisAndVFX = true,
-    RemoveNonEventAreas = true,        -- Xóa PSX Portal, PSX Hall
-    CleanUnusedThingsFolders = true,   -- Xóa thư mục minigame ngoài event/farm/hatch
-    CleanUnusedAssets = true,          -- Xóa Assets ngoài event/farm/hatch
-    CleanUnusedDirectory = true,       -- Xóa __DIRECTORY ngoài event/farm/hatch
+    RemoveNonEventAreas = true,        -- Xóa PSX Portal, PSX Hall (giữ PumpkinTycoonSections*)
+    CleanUnusedThingsFolders = true,   -- Chỉ xóa thư mục minigame ngoài event
+    CleanUnusedAssets = true,          -- Chỉ xóa Assets ngoài event (giữ Assets.PumpkinTycoon)
+    CleanUnusedDirectory = true,       -- Chỉ xóa __DIRECTORY ngoài event
+
     -- 4. Auto Collect & Hide Orb / Lootbag
     AutoCollectOrb = true,
     HideOrb = true,
     HideLootbag = true,
     OrbSweepInterval = 0.5,
+
     -- 5. Tắt tiến trình chạy ngầm & Dọn RAM Lua
-    DisableBackgroundLoops = true,     -- Tắt PumpkinFx, TurkeyFx & module thừa (GIỮ Hunt, Wild, Nets, Pumpkins, Farm, Hatch)
+    DisableBackgroundLoops = true,     -- Tắt PumpkinFx, TurkeyFx & module thừa (GIỮ Hunt, Wild, Nets, Pumpkins)
     DisableCustomPetSerialFX = true,
     DisableFxNetworkEvents = true,
-    GarbageCollectInterval = 30,       -- Dọn RAM mỗi 30s để chống tăng RAM khi tele nhiều
+    GarbageCollectInterval = 45,
     SweepInterval = 5.0,
 }
+
 local Connections = {}
 local function Bind(sig, fn)
     if not sig then return nil end
@@ -68,6 +76,7 @@ local function Bind(sig, fn)
     end
     return nil
 end
+
 env._PS99PumpkinOptStop = function()
     Config.Running = false
     for i = #Connections, 1, -1 do
@@ -78,9 +87,11 @@ env._PS99PumpkinOptStop = function()
         pcall(RunService.Set3dRenderingEnabled, RunService, true)
     end
 end
+
 local Library = ReplicatedStorage:WaitForChild("Library", 30)
 local NetworkFolder = ReplicatedStorage:FindFirstChild("Network")
     or (Library and Library:FindFirstChild("Network"))
+
 local function SafeRequire(parent, ...)
     local cur = parent
     for _, name in ipairs({ ... }) do
@@ -91,11 +102,13 @@ local function SafeRequire(parent, ...)
     local ok, mod = pcall(require, cur)
     return ok and mod or nil
 end
+
 local Modules = {
     Variables = SafeRequire(Library, "Variables") or SafeRequire(Library, "Client", "Variables"),
     Network = SafeRequire(Library, "Client", "Network"),
     OrbClass = SafeRequire(Library, "Client", "OrbCmds", "Orb"),
 }
+
 -- ============================================================================
 -- HÀM XÓA HIỆU ỨNG & ẨN INSTANCE AN TOÀN
 -- ============================================================================
@@ -114,8 +127,10 @@ local EffectClasses = {
     BillboardGui = true,
     SurfaceGui = true,
 }
+
 local function DestroyEffectOrHide(obj, preservePhysics)
     if not obj or not obj.Parent then return end
+
     if Config.BlockAllEffects and EffectClasses[obj.ClassName] then
         pcall(function()
             if obj:IsA("ParticleEmitter") then obj:Clear() end
@@ -124,6 +139,7 @@ local function DestroyEffectOrHide(obj, preservePhysics)
         pcall(obj.Destroy, obj)
         return
     end
+
     if obj:IsA("BasePart") then
         pcall(function()
             obj.Transparency = 1
@@ -146,6 +162,7 @@ local function DestroyEffectOrHide(obj, preservePhysics)
         end)
     end
 end
+
 local function HideTreeVisual(root, preservePhysics)
     if not root or not root.Parent then return end
     DestroyEffectOrHide(root, preservePhysics)
@@ -153,6 +170,7 @@ local function HideTreeVisual(root, preservePhysics)
         DestroyEffectOrHide(d, preservePhysics)
     end
 end
+
 -- ============================================================================
 -- 1. POTATO MODE + ENGINE / FPS / LIGHTING / TERRAIN / COREGUI
 -- ============================================================================
@@ -167,18 +185,22 @@ local function ApplyGamePotatoMode()
     end
     pcall(Workspace.SetAttribute, Workspace, "GlobalInstantHatch", true)
 end
+
 local function ApplyEngineAndLighting()
     if Config.TargetFPS and Config.TargetFPS > 0 and type(setfpscap) == "function" then
         pcall(setfpscap, Config.TargetFPS)
     end
+
     if Config.LowestRenderQuality then
         pcall(function()
             settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
         end)
     end
+
     if Config.Disable3DRendering then
         pcall(RunService.Set3dRenderingEnabled, RunService, false)
     end
+
     if Config.HideDefaultCoreGui then
         pcall(function()
             StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
@@ -189,6 +211,7 @@ local function ApplyEngineAndLighting()
             if expChat then expChat:Destroy() end
         end)
     end
+
     if Config.OptimizeLightingAndTerrain then
         pcall(function()
             Lighting.GlobalShadows = false
@@ -201,6 +224,7 @@ local function ApplyEngineAndLighting()
                     pcall(v.Destroy, v)
                 end
             end
+
             local t = Workspace.Terrain
             if t then
                 t.Decoration = false
@@ -211,6 +235,7 @@ local function ApplyEngineAndLighting()
             end
         end)
     end
+
     if Config.MuteAllSounds then
         for _, s in ipairs(SoundService:GetDescendants()) do
             if s:IsA("Sound") then
@@ -219,11 +244,13 @@ local function ApplyEngineAndLighting()
         end
     end
 end
+
 -- ============================================================================
--- 2. XÓA SẠCH MỌI HIỆU ỨNG TOÀN GAME (EMIT, PARTICLE, LIGHT, BILLBOARDGUI)
+-- 2. XÓA SẠCH MỌI HIỆU ỨNG TOÀN GAME
 -- ============================================================================
 local function SetupGlobalEffectBlocker()
     if not Config.BlockAllEffects then return end
+
     local fnFolder = Library and Library:FindFirstChild("Functions")
     if fnFolder then
         for _, name in ipairs({ "Emit", "EmitFast", "EmitOne" }) do
@@ -236,16 +263,19 @@ local function SetupGlobalEffectBlocker()
             end
         end
     end
+
     for _, d in ipairs(Workspace:GetDescendants()) do
         if EffectClasses[d.ClassName] then
             DestroyEffectOrHide(d, true)
         end
     end
+
     Bind(Workspace.DescendantAdded, function(d)
         if Config.Running and EffectClasses[d.ClassName] then
             task.defer(DestroyEffectOrHide, d, true)
         end
     end)
+
     if Workspace.CurrentCamera then
         Bind(Workspace.CurrentCamera.DescendantAdded, function(d)
             if Config.Running and EffectClasses[d.ClassName] then
@@ -253,6 +283,7 @@ local function SetupGlobalEffectBlocker()
             end
         end)
     end
+
     local pGui = LocalPlayer:FindFirstChild("PlayerGui")
     if pGui then
         for _, d in ipairs(pGui:GetDescendants()) do
@@ -269,25 +300,30 @@ local function SetupGlobalEffectBlocker()
         end)
     end
 end
+
 -- ============================================================================
--- 3. ẨN MAP/TYCOONS/PLOTS/PETS/BREAKABLES + DỌN RAM NGOÀI PUMPKIN TYCOON
+-- 3. ẨN MAP/TYCOONS/PLOTS/PETS + DỌN RAM NGOÀI PUMPKIN TYCOON
 -- ============================================================================
+-- LƯU Ý: Giữ nguyên Hunt, Plots, Tycoons, __INSTANCE_CONTAINER, PumpkinTycoonSections*
 local UnusedThingsFolders = {
     "TowerDefenseMaps", "TowerDefenseEnemies", "TowerDefenseTowers", "TowerDefenseProjectiles",
     "FarmEggs", "EventFishingSpots", "Boats", "Ski Chairs",
     "Booths", "Hoverboards", "MasteryCapes", "AnimatedCards", "CardPacks",
     "BlockWorlds", "ExclusiveEggs", "ExclusiveEggPets",
 }
+
 local UnusedAssetsFolders = {
     "Particles", "Billboards", "ExclusiveEggs", "HatchWarLuckyOrbs",
     "TowerDefense", "AdminAbuse", "WelcomeBack",
 }
+
 local UnusedDirectoryFolders = {
     "CardItems", "Hoverboards", "Booths", "Boats",
     "TowerDefenseTowers", "FarmingAttributes",
     "FishingRods", "DigsiteOres", "DigsiteChests", "DigsiteBlocks",
     "Shovels", "Seeds", "WateringCans", "SpinnyWheels", "VendingMachines",
 }
+
 local function CleanupNonEventRAM(initialRun)
     if initialRun then
         if Config.RemoveNonEventAreas then
@@ -296,6 +332,7 @@ local function CleanupNonEventRAM(initialRun)
                 if obj then pcall(obj.Destroy, obj) end
             end
         end
+
         if Config.CleanUnusedAssets then
             local assets = ReplicatedStorage:FindFirstChild("Assets")
             if assets then
@@ -305,6 +342,7 @@ local function CleanupNonEventRAM(initialRun)
                 end
             end
         end
+
         if Config.CleanUnusedDirectory then
             local dir = ReplicatedStorage:FindFirstChild("__DIRECTORY")
             if dir then
@@ -315,6 +353,7 @@ local function CleanupNonEventRAM(initialRun)
             end
         end
     end
+
     local things = Workspace:FindFirstChild("__THINGS")
     if initialRun and Config.CleanUnusedThingsFolders and things then
         for _, name in ipairs(UnusedThingsFolders) do
@@ -322,6 +361,7 @@ local function CleanupNonEventRAM(initialRun)
             if f then pcall(f.Destroy, f) end
         end
     end
+
     if Config.ClearDebrisAndVFX then
         local debris = Workspace:FindFirstChild("__DEBRIS")
         if debris then
@@ -329,6 +369,7 @@ local function CleanupNonEventRAM(initialRun)
                 pcall(c.Destroy, c)
             end
         end
+
         local vfx = things and things:FindFirstChild("VFX")
         if vfx then
             for _, c in ipairs(vfx:GetChildren()) do
@@ -337,6 +378,7 @@ local function CleanupNonEventRAM(initialRun)
         end
     end
 end
+
 local function StripOtherPlayerChar(char)
     if not Config.StripOtherPlayers or not char or char == LocalPlayer.Character then return end
     for _, d in ipairs(char:GetDescendants()) do
@@ -356,8 +398,9 @@ local function StripOtherPlayerChar(char)
         end
     end
 end
+
 local function SetupPumpkinVisualHider()
-    -- Ẩn Map nhưng GIỮ nguyên CanCollide & CanTouch (Auto Hunt tele liên tục)
+    -- Ẩn Map nhưng GIỮ nguyên CanCollide & CanTouch (vì Auto Hunt tele rất nhiều)
     local mapFolder = Workspace:FindFirstChild("Map")
     if Config.HideMapAndTycoons and mapFolder then
         HideTreeVisual(mapFolder, true)
@@ -367,6 +410,7 @@ local function SetupPumpkinVisualHider()
             end
         end)
     end
+
     local things = Workspace:FindFirstChild("__THINGS")
     if things then
         -- Ẩn Tycoons, Plots & __INSTANCE_CONTAINER nhưng GIỮ nguyên vật lý & touch
@@ -383,6 +427,7 @@ local function SetupPumpkinVisualHider()
                 end
             end
         end
+
         -- Ẩn Pets (vẫn giữ CustomPet/PlayerPet hoạt động bình thường)
         local petsFolder = things:FindFirstChild("Pets")
         if Config.HidePets and petsFolder then
@@ -393,17 +438,8 @@ local function SetupPumpkinVisualHider()
                 end
             end)
         end
-        -- Ẩn Breakables (CHỈ ẨN, KHÔNG DESTROY -> vẫn farm bình thường)
-        local breakablesFolder = things:FindFirstChild("Breakables")
-        if Config.HideBreakables and breakablesFolder then
-            HideTreeVisual(breakablesFolder, false)
-            Bind(breakablesFolder.DescendantAdded, function(d)
-                if Config.Running and Config.HideBreakables then
-                    task.defer(DestroyEffectOrHide, d, false)
-                end
-            end)
-        end
     end
+
     if Config.StripOtherPlayers then
         for _, plr in ipairs(Players:GetPlayers()) do
             if plr ~= LocalPlayer then
@@ -422,13 +458,15 @@ local function SetupPumpkinVisualHider()
         end)
     end
 end
+
 -- ============================================================================
--- 4. AUTO COLLECT & HIDE ORB / LOOTBAG (CHUẨN ORBCMDS)
+-- 4. AUTO COLLECT & HIDE ORB / LOOTBAG
 -- ============================================================================
 local function InstallOrbRenderStub()
     local OrbClass = Modules.OrbClass
     if (not Config.HideOrb and not Config.HideLootbag) or type(OrbClass) ~= "table" then return end
     if rawget(OrbClass, "__orbHideStub") then return end
+
     local dummyFn = function() end
     local mt = {
         __index = {
@@ -443,6 +481,7 @@ local function InstallOrbRenderStub()
             Collect = function(self) self._collected = true end,
         },
     }
+
     local function stubNew(id)
         return setmetatable({
             _id = id,
@@ -451,6 +490,7 @@ local function InstallOrbRenderStub()
             _combinedIds = {},
         }, mt)
     end
+
     pcall(function()
         if type(hookfunction) == "function" and type(OrbClass.new) == "function" then
             hookfunction(OrbClass.new, stubNew)
@@ -462,6 +502,7 @@ local function InstallOrbRenderStub()
         rawset(OrbClass, "__orbHideStub", true)
     end)
 end
+
 local function FireCollectOrbs(ids)
     if #ids == 0 then return end
     local remote = NetworkFolder and NetworkFolder:FindFirstChild("Orbs: Collect")
@@ -471,6 +512,7 @@ local function FireCollectOrbs(ids)
         pcall(Modules.Network.Fire, "Orbs: Collect", ids)
     end
 end
+
 local function SetupOrbLootbagListeners()
     if Modules.Network and type(Modules.Network.Fired) == "function" then
         local okSig, sig = pcall(Modules.Network.Fired, "Orbs: Create")
@@ -488,6 +530,7 @@ local function SetupOrbLootbagListeners()
             end)
         end
     end
+
     local things = Workspace:FindFirstChild("__THINGS")
     for _, folderName in ipairs({ "Orbs", "Lootbags" }) do
         local folder = things and things:FindFirstChild(folderName)
@@ -506,9 +549,11 @@ local function SetupOrbLootbagListeners()
         end
     end
 end
+
 local function SweepOrbsAndLootbags()
     local things = Workspace:FindFirstChild("__THINGS")
     if not things then return end
+
     for _, folderName in ipairs({ "Orbs", "Lootbags" }) do
         local folder = things:FindFirstChild(folderName)
         if folder then
@@ -536,12 +581,13 @@ local function SweepOrbsAndLootbags()
         end
     end
 end
+
 -- ============================================================================
--- 5. TẮT TIẾN TRÌNH NGẦM (CẮT PUMPKINFX & TURKEYFX, GIỮ HUNT / FARM / HATCH)
+-- 5. TẮT TIẾN TRÌNH NGẦM (CẮT PUMPKINFX & TURKEYFX, GIỮ HUNT / WILD / NETS)
 -- ============================================================================
 local BlacklistPatterns = {
-    "PumpkinTycoonCmds.PumpkinFx",
-    "PumpkinTycoonCmds.TurkeyFx",
+    "PumpkinTycoonCmds.PumpkinFx",     -- Thuần hiệu ứng bí ngô
+    "PumpkinTycoonCmds.TurkeyFx",      -- Thuần hiệu ứng turkey (4,253 dòng)
     "DoodleBattleCmds",
     "EventFishingCmds",
     "BoothCmds",
@@ -566,6 +612,7 @@ local BlacklistPatterns = {
     "LootboxAnimation",
     "CardPackAnimation",
 }
+
 local WhitelistPatterns = {
     "PumpkinTycoonCmds.Hunt",
     "PumpkinTycoonCmds.Wild",
@@ -591,6 +638,7 @@ local WhitelistPatterns = {
     "GoalCmds",
     "PlayerModule",
 }
+
 local function GetScriptPathFromFunc(fn)
     if type(fn) ~= "function" then return nil end
     local ok, fnEnv = pcall(getfenv, fn)
@@ -605,6 +653,7 @@ local function GetScriptPathFromFunc(fn)
     end
     return nil
 end
+
 local function MatchesAny(str, list)
     for _, pat in ipairs(list) do
         if string.find(str, pat, 1, true) then
@@ -613,8 +662,10 @@ local function MatchesAny(str, list)
     end
     return false
 end
+
 local function DisableDeepBackgroundWork()
     local disabledCount = 0
+
     if Config.DisableBackgroundLoops and type(getconnections) == "function" then
         for _, signal in ipairs({ RunService.RenderStepped, RunService.Heartbeat, RunService.Stepped }) do
             local ok, conns = pcall(getconnections, signal)
@@ -634,6 +685,7 @@ local function DisableDeepBackgroundWork()
             end
         end
     end
+
     if Config.DisableCustomPetSerialFX and type(getgc) == "function" and type(hookfunction) == "function" then
         pcall(function()
             for _, v in ipairs(getgc(false)) do
@@ -651,6 +703,7 @@ local function DisableDeepBackgroundWork()
             end
         end)
     end
+
     if Config.DisableFxNetworkEvents and type(getconnections) == "function" and NetworkFolder then
         for _, rName in ipairs({
             "Eggs_PlayOpenAnimation",
@@ -667,9 +720,11 @@ local function DisableDeepBackgroundWork()
             end
         end
     end
+
     pcall(collectgarbage, "collect")
-    print(("[PS99 PumpkinTycoon Optimizer] Đã tắt %d tiến trình ngầm (giữ Hunt/Farm/Hatch)."):format(disabledCount))
+    print(("[PS99 PumpkinTycoon Optimizer] Đã tắt %d tiến trình ngầm (giữ nguyên Hunt/Wild/Nets/Pets)."):format(disabledCount))
 end
+
 -- ============================================================================
 -- KHỞI CHẠY HỆ THỐNG
 -- ============================================================================
@@ -682,6 +737,7 @@ InstallOrbRenderStub()
 SetupOrbLootbagListeners()
 SweepOrbsAndLootbags()
 DisableDeepBackgroundWork()
+
 -- Quét dọn Orb/Lootbag nhanh
 task.spawn(function()
     while Config.Running do
@@ -689,6 +745,7 @@ task.spawn(function()
         task.wait(Config.OrbSweepInterval or 0.5)
     end
 end)
+
 -- Giữ PotatoMode & dọn __DEBRIS / VFX định kỳ
 task.spawn(function()
     while Config.Running do
@@ -699,10 +756,11 @@ task.spawn(function()
         task.wait(Config.SweepInterval or 5.0)
     end
 end)
--- Dọn RAM Lua định kỳ (chống tăng RAM khi tele nhiều)
+
+-- Dọn RAM Lua định kỳ
 task.spawn(function()
     while Config.Running do
-        task.wait(Config.GarbageCollectInterval or 30)
+        task.wait(Config.GarbageCollectInterval or 45)
         if not Config.Running then break end
         pcall(collectgarbage, "collect")
     end
