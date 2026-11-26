@@ -1,335 +1,93 @@
--- ============================================================================
--- PS99 ULTIMATE OPTIMIZER - PUMPKINTYCOON (AUTO HUNT + FARM + HATCH + HUD)
--- 1. POTATO MODE + ENGINE / FPS / LIGHTING / TERRAIN / SOUND / COREGUI
--- 2. NÚT NỔI BẬT / TẮT 3D RENDER + HUD RANK PUMPKIN CATCHES & FPS (CẦU VỒNG)
--- 3. XÓA SẠCH 100% HIỆU ỨNG (PARTICLE, CONFETTI, LIGHT, BILLBOARDGUI, EMIT)
--- 4. ẨN MAP / PUMPKIN ISLANDS / BÍ / PET / BREAKABLE (GIỮ RAYCAST & FARM)
--- 5. AUTO COLLECT & HIDE ORB / LOOTBAG (CHUẨN ORBCMDS)
--- 6. TẮT PUMPKINFX, TURKEYFX, PROCESSSERIALFX & DỌN RAM ĐỊNH KỲ
--- ============================================================================
+-- XUANTAM | PET SIM 99 FIX LAG + SEPARATE WHITE SCREEN + SINGLE HUD
+if getgenv().XuantamPS99FixLoaded then
+    return
+end
+getgenv().XuantamPS99FixLoaded = true
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-local Lighting = game:GetService("Lighting")
-local SoundService = game:GetService("SoundService")
 local RunService = game:GetService("RunService")
-local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
 
-if not game:IsLoaded() then
-    pcall(function() game.Loaded:Wait() end)
-end
-while not Players.LocalPlayer do
-    task.wait(0.1)
-end
-local LocalPlayer = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
-local env = (type(getgenv) == "function" and getgenv()) or _G
-if type(env._PS99PumpkinOptStop) == "function" then
-    pcall(env._PS99PumpkinOptStop)
-end
-
-local Config = {
-    Running = true,
-
-    -- 1. Tối ưu có sẵn & Engine / FPS
-    EnableGamePotatoMode = true,
-    TargetFPS = 15,                    -- Khuyên dùng 15-20 khi Auto Hunt tele liên tục (0 = không giới hạn)
-    LowestRenderQuality = true,
-    Disable3DRendering = false,        -- Bật/tắt trực tiếp bằng nút nổi trên màn hình
-    OptimizeLightingAndTerrain = true,
-    MuteAllSounds = true,
-    HideDefaultCoreGui = true,         -- Tắt Chat, PlayerList, Backpack, Emotes & xóa ExperienceChat
-
-    -- 2. Giao diện tiện ích
-    Enable3DRenderToggle = true,       -- Nút bật/tắt 3D Render
-    EnableLeaderboardHUD = true,       -- HUD Rank PumpkinCatches + FPS (cầu vồng)
-
-    -- 3. Ẩn hình ảnh & Xóa hiệu ứng (Vẫn farm & tele Hunt bình thường)
-    HideMapAndTycoons = true,          -- Ẩn Map/PumpkinTycoonIslands/Bí/Plots (GIỮ Raycast/CanCollide/CanTouch)
-    HidePets = true,                   -- Ẩn model Pet (vẫn chạy & farm bình thường)
-    HideBreakables = true,             -- Ẩn model Breakable (KHÔNG Destroy -> vẫn farm bình thường)
-    StripOtherPlayers = true,          -- Dọn phụ kiện, animation & ẩn nhân vật người chơi khác
-    BlockAllEffects = true,            -- Xóa sạch ParticleEmitter, Confetti, Light, BillboardGui, Emit
-
-    -- 4. Dọn RAM (GIỮ NGUYÊN PumpkinTycoonSections*, Hunt, Plots, Tycoons, Instances)
-    ClearDebrisAndVFX = true,
-    RemoveNonEventAreas = true,        -- Xóa PSX Portal, PSX Hall
-    CleanUnusedThingsFolders = true,   -- Xóa thư mục minigame ngoài event/farm/hatch
-    CleanUnusedAssets = true,          -- Xóa Assets ngoài event/farm/hatch
-    CleanUnusedDirectory = true,       -- Xóa __DIRECTORY ngoài event/farm/hatch
-
-    -- 5. Auto Collect & Hide Orb / Lootbag
-    AutoCollectOrb = true,
-    HideOrb = true,
-    HideLootbag = true,
-    OrbSweepInterval = 0.5,
-
-    -- 6. Tắt tiến trình chạy ngầm & Dọn RAM Lua
-    DisableBackgroundLoops = true,     -- Tắt PumpkinFx, TurkeyFx & module thừa (GIỮ Hunt, Wild, Nets, Pumpkins, Farm, Hatch)
-    DisableCustomPetSerialFX = true,
-    DisableFxNetworkEvents = true,
-    GarbageCollectInterval = 30,       -- Dọn RAM mỗi 30s để chống tăng RAM khi tele nhiều
-    SweepInterval = 5.0,
-}
-
-local Connections = {}
-local CreatedGuis = {}
-
-local function Bind(sig, fn)
-    if not sig then return nil end
-    local ok, conn = pcall(function() return sig:Connect(fn) end)
-    if ok and conn then
-        table.insert(Connections, conn)
-        return conn
-    end
-    return nil
-end
-
-env._PS99PumpkinOptStop = function()
-    Config.Running = false
-    for i = #Connections, 1, -1 do
-        pcall(function() Connections[i]:Disconnect() end)
-        Connections[i] = nil
-    end
-    for i = #CreatedGuis, 1, -1 do
-        pcall(function() CreatedGuis[i]:Destroy() end)
-        CreatedGuis[i] = nil
-    end
-    pcall(RunService.Set3dRenderingEnabled, RunService, true)
-end
-
-local Library = ReplicatedStorage:WaitForChild("Library", 30)
-local NetworkFolder = ReplicatedStorage:FindFirstChild("Network")
-    or (Library and Library:FindFirstChild("Network"))
-
-local function SafeRequire(parent, ...)
-    local cur = parent
-    for _, name in ipairs({ ... }) do
-        if not cur then return nil end
-        cur = cur:FindFirstChild(name) or cur:WaitForChild(name, 10)
-    end
-    if not cur then return nil end
-    local ok, mod = pcall(require, cur)
-    return ok and mod or nil
-end
-
-local Modules = {
-    Variables = SafeRequire(Library, "Variables") or SafeRequire(Library, "Client", "Variables"),
-    Network = SafeRequire(Library, "Client", "Network"),
-    OrbClass = SafeRequire(Library, "Client", "OrbCmds", "Orb"),
-    LeaderboardCmds = SafeRequire(Library, "Client", "LeaderboardCmds"),
-    PumpkinContestsUtil = SafeRequire(Library, "Util", "PumpkinContestsUtil"),
-}
-
-local function GetGuiParent()
-    if type(gethui) == "function" then
-        local ok, ui = pcall(gethui)
-        if ok and ui then return ui end
-    end
-    local okCore = pcall(function() return CoreGui.Name end)
-    if okCore then return CoreGui end
-    return LocalPlayer:FindFirstChild("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 10)
-end
-
--- ============================================================================
--- HÀM XÓA HIỆU ỨNG & ẨN INSTANCE AN TOÀN
--- ============================================================================
-local EffectClasses = {
-    ParticleEmitter = true,
-    Beam = true,
-    Trail = true,
-    Fire = true,
-    Smoke = true,
-    Sparkles = true,
-    Explosion = true,
-    PointLight = true,
-    SpotLight = true,
-    SurfaceLight = true,
-    Highlight = true,
-    BillboardGui = true,
-    SurfaceGui = true,
-}
-
-local function DestroyEffectOrHide(obj, preservePhysics)
-    if not obj or not obj.Parent then return end
-
-    if Config.BlockAllEffects and EffectClasses[obj.ClassName] then
-        pcall(function()
-            if obj:IsA("ParticleEmitter") then obj:Clear() end
-            obj.Enabled = false
-        end)
-        pcall(obj.Destroy, obj)
-        return
-    end
-
-    if obj:IsA("BasePart") then
-        pcall(function()
-            obj.Transparency = 1
-            obj.CastShadow = false
-            obj.Material = Enum.Material.SmoothPlastic
-            if not preservePhysics then
-                obj.CanCollide = false
-                obj.CanTouch = false
-                obj.CanQuery = false
-            end
-        end)
-    elseif obj:IsA("Decal") or obj:IsA("Texture") then
-        pcall(function() obj.Transparency = 1 end)
-    elseif obj:IsA("SurfaceAppearance") then
-        pcall(obj.Destroy, obj)
-    elseif Config.MuteAllSounds and obj:IsA("Sound") then
-        pcall(function()
-            obj.Volume = 0
-            obj:Stop()
-        end)
-    end
-end
-
-local function HideTreeVisual(root, preservePhysics)
-    if not root or not root.Parent then return end
-    DestroyEffectOrHide(root, preservePhysics)
-    for _, d in ipairs(root:GetDescendants()) do
-        DestroyEffectOrHide(d, preservePhysics)
-    end
-end
-
--- ============================================================================
--- 1. POTATO MODE + ENGINE / FPS / LIGHTING / TERRAIN / COREGUI
--- ============================================================================
-local function ApplyGamePotatoMode()
-    if not Config.EnableGamePotatoMode then return end
-    local vars = Modules.Variables
-    if type(vars) == "table" then
-        pcall(function()
-            vars.PotatoMode = true
-            vars.EggPotatoMode = true
-        end)
-    end
-    pcall(Workspace.SetAttribute, Workspace, "GlobalInstantHatch", true)
-end
-
-local function ApplyEngineAndLighting()
-    if Config.TargetFPS and Config.TargetFPS > 0 and type(setfpscap) == "function" then
-        pcall(setfpscap, Config.TargetFPS)
-    end
-
-    if Config.LowestRenderQuality then
-        pcall(function()
-            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-        end)
-    end
-
-    pcall(RunService.Set3dRenderingEnabled, RunService, not Config.Disable3DRendering)
-
-    if Config.HideDefaultCoreGui then
-        pcall(function()
-            StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
-        end)
-        pcall(function()
-            local expChat = CoreGui:FindFirstChild("ExperienceChat")
-            if expChat then expChat:Destroy() end
-        end)
-    end
-
-    if Config.OptimizeLightingAndTerrain then
-        pcall(function()
-            Lighting.GlobalShadows = false
-            Lighting.FogEnd = 9e9
-            Lighting.Brightness = 1
-            for _, v in ipairs(Lighting:GetChildren()) do
-                if v:IsA("PostEffect") then
-                    v.Enabled = false
-                elseif v:IsA("Atmosphere") or v:IsA("Sky") then
-                    pcall(v.Destroy, v)
-                end
-            end
-
-            local t = Workspace.Terrain
-            if t then
-                t.Decoration = false
-                t.WaterWaveSize = 0
-                t.WaterWaveSpeed = 0
-                t.WaterReflectance = 0
-                t.WaterTransparency = 1
-            end
-        end)
-    end
-
-    if Config.MuteAllSounds then
-        for _, s in ipairs(SoundService:GetDescendants()) do
-            if s:IsA("Sound") then
-                pcall(function() s.Volume = 0; s:Stop() end)
-            end
-        end
-    end
-end
-
--- ============================================================================
--- 2A. NÚT BẬT / TẮT DISABLE 3D RENDERING (KÉO THẢ ĐƯỢC)
--- ============================================================================
-local function Create3DRenderToggleUI()
-    if not Config.Enable3DRenderToggle then return end
-    local parentGui = GetGuiParent()
-    if not parentGui then return end
-
-    local old = parentGui:FindFirstChild("PS99_3DRenderToggle")
-    if old then pcall(old.Destroy, old) end
-
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "PS99_3DRenderToggle"
-    sg.ResetOnSpawn = false
-    sg.IgnoreGuiInset = true
-    sg.DisplayOrder = 999999
-    sg.Parent = parentGui
-    table.insert(CreatedGuis, sg)
-
-    local btn = Instance.new("TextButton")
-    btn.Name = "ToggleBtn"
-    btn.Size = UDim2.fromOffset(124, 34)
-    btn.Position = UDim2.new(0, 14, 0, 110)
-    btn.AutoButtonColor = true
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 13
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.BorderSizePixel = 0
-    btn.Active = true
-    btn.Draggable = true
-    btn.Parent = sg
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = btn
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Thickness = 1.5
-    stroke.Color = Color3.fromRGB(255, 255, 255)
-    stroke.Transparency = 0.65
-    stroke.Parent = btn
-
-    local function RefreshVisual()
-        if Config.Disable3DRendering then
-            btn.Text = "3D Render: OFF"
-            btn.BackgroundColor3 = Color3.fromRGB(190, 55, 55)
-        else
-            btn.Text = "3D Render: ON"
-            btn.BackgroundColor3 = Color3.fromRGB(45, 160, 85)
-        end
-    end
-
-    RefreshVisual()
-
-    Bind(btn.MouseButton1Click, function()
-        Config.Disable3DRendering = not Config.Disable3DRendering
-        pcall(RunService.Set3dRenderingEnabled, RunService, not Config.Disable3DRendering)
-        RefreshVisual()
+local function GetSafeGuiParent()
+    local ok, res = pcall(function()
+        return gethui and gethui() or CoreGui
     end)
+    if ok and res then
+        return res
+    end
+    return LocalPlayer:FindFirstChildOfClass("PlayerGui") or CoreGui
 end
 
--- ============================================================================
--- 2B. HUD LEADERBOARD PUMPKIN CATCHES + FPS (CHỮ CẦU VỒNG, KÉO THẢ ĐƯỢC)
--- ============================================================================
+local GuiParent = GetSafeGuiParent()
+
+local function DestroyOldGui(name)
+    for _, container in ipairs({ CoreGui, GuiParent, LocalPlayer:FindFirstChildOfClass("PlayerGui") }) do
+        if container then
+            local old = container:FindFirstChild(name)
+            if old then
+                pcall(old.Destroy, old)
+            end
+        end
+    end
+end
+
+for _, name in ipairs({ "XuantamFixLagUI", "XuantamToggleUI", "XuantamWhiteScreen", "PumpkinCatches_Leaderboard_HUD" }) do
+    DestroyOldGui(name)
+end
+
+-- ==========================================
+-- FUNCTION RIÊNG: BẬT / TẮT MÀN HÌNH TRẮNG
+-- (Hoàn toàn độc lập, không ảnh hưởng đến GUI HUD)
+-- ==========================================
+local WhiteScreenGui = Instance.new("ScreenGui")
+WhiteScreenGui.Name = "XuantamWhiteScreen"
+WhiteScreenGui.ResetOnSpawn = false
+WhiteScreenGui.IgnoreGuiInset = true
+WhiteScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+WhiteScreenGui.DisplayOrder = 1000 -- Nằm dưới HudGui (2147483647)
+WhiteScreenGui.Enabled = true
+WhiteScreenGui.Parent = GuiParent
+
+local WhiteBackground = Instance.new("Frame")
+WhiteBackground.Name = "WhiteBackground"
+WhiteBackground.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+WhiteBackground.BackgroundTransparency = 0
+WhiteBackground.Size = UDim2.new(2, 0, 2, 0)
+WhiteBackground.Position = UDim2.new(-0.5, 0, -0.5, 0)
+WhiteBackground.BorderSizePixel = 0
+WhiteBackground.Parent = WhiteScreenGui
+
+local isWhiteScreenEnabled = true
+
+local function SetWhiteScreen(state)
+    if type(state) == "boolean" then
+        isWhiteScreenEnabled = state
+    else
+        isWhiteScreenEnabled = not isWhiteScreenEnabled
+    end
+
+    WhiteScreenGui.Enabled = isWhiteScreenEnabled
+    pcall(function()
+        RunService:Set3dRenderingEnabled(not isWhiteScreenEnabled)
+    end)
+
+    return isWhiteScreenEnabled
+end
+
+-- Xuất ra global để gọi bật/tắt bất cứ lúc nào từ ngoài (SetWhiteScreen(true/false) hoặc SetWhiteScreen())
+getgenv().SetWhiteScreen = SetWhiteScreen
+
+-- Khởi chạy mặc định: Bật màn trắng
+SetWhiteScreen(true)
+
+-- ==========================================
+-- ĐỌC DỮ LIỆU BẢNG XẾP HẠNG
+-- ==========================================
 local function FormatCommas(value, fallback)
     if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
         return fallback or "0"
@@ -338,22 +96,47 @@ local function FormatCommas(value, fallback)
     return (digits:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", ""))
 end
 
-local function GetLeaderboardData(customBoardId)
-    if not Modules.LeaderboardCmds then
-        Modules.LeaderboardCmds = SafeRequire(Library, "Client", "LeaderboardCmds")
+local function SafeRequire(parent, ...)
+    if not parent then
+        return nil
     end
-    if not Modules.PumpkinContestsUtil then
-        Modules.PumpkinContestsUtil = SafeRequire(Library, "Util", "PumpkinContestsUtil")
+    local cur = parent
+    for _, name in ipairs({ ... }) do
+        if not cur then
+            return nil
+        end
+        cur = cur:FindFirstChild(name)
+    end
+    if not cur then
+        return nil
+    end
+    local ok, mod = pcall(require, cur)
+    return ok and mod or nil
+end
+
+local Library = ReplicatedStorage:FindFirstChild("Library")
+local LeaderboardCmds = SafeRequire(Library, "Client", "LeaderboardCmds")
+local PumpkinContestsUtil = SafeRequire(Library, "Util", "PumpkinContestsUtil")
+
+local function GetLeaderboardData(customBoardId)
+    if not Library then
+        Library = ReplicatedStorage:FindFirstChild("Library")
+    end
+    if not LeaderboardCmds then
+        LeaderboardCmds = SafeRequire(Library, "Client", "LeaderboardCmds")
+    end
+    if not PumpkinContestsUtil then
+        PumpkinContestsUtil = SafeRequire(Library, "Util", "PumpkinContestsUtil")
     end
 
     local boardId = customBoardId
-        or (Modules.PumpkinContestsUtil and Modules.PumpkinContestsUtil.BOARD_ID)
+        or (PumpkinContestsUtil and PumpkinContestsUtil.BOARD_ID)
         or "PumpkinTycoonCatches"
 
     local rank, score = nil, 0
 
-    if Modules.LeaderboardCmds and type(Modules.LeaderboardCmds.Get) == "function" then
-        local okGet, state = pcall(Modules.LeaderboardCmds.Get, boardId)
+    if LeaderboardCmds and type(LeaderboardCmds.Get) == "function" then
+        local okGet, state = pcall(LeaderboardCmds.Get, boardId)
         if okGet and type(state) == "table" then
             local myData = type(state.LocalPlayer) == "table" and state.LocalPlayer or nil
             if myData then
@@ -381,7 +164,7 @@ local function MakeDraggable(guiObject)
     local dragStart = Vector2.zero
     local startPos = guiObject.Position
 
-    Bind(guiObject.InputBegan, function(input)
+    guiObject.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch
         then
@@ -392,7 +175,7 @@ local function MakeDraggable(guiObject)
         end
     end)
 
-    Bind(UserInputService.InputChanged, function(input)
+    UserInputService.InputChanged:Connect(function(input)
         if not dragging or input ~= activeInput then return end
         if input.UserInputType == Enum.UserInputType.MouseMovement
             or input.UserInputType == Enum.UserInputType.Touch
@@ -407,7 +190,7 @@ local function MakeDraggable(guiObject)
         end
     end)
 
-    Bind(UserInputService.InputEnded, function(input)
+    UserInputService.InputEnded:Connect(function(input)
         if input == activeInput then
             dragging = false
             activeInput = nil
@@ -415,641 +198,427 @@ local function MakeDraggable(guiObject)
     end)
 end
 
-local function CreateLeftRainbowHud()
-    if not Config.EnableLeaderboardHUD then return end
-    local targetParent = GetGuiParent()
-    if not targetParent then return end
+-- ==========================================
+-- 1 GUI DUY NHẤT: HIỂN THỊ TÊN / BXH|SCORE / FPS
+-- ==========================================
+local HudGui = Instance.new("ScreenGui")
+HudGui.Name = "XuantamFixLagUI"
+HudGui.ResetOnSpawn = false
+HudGui.IgnoreGuiInset = true
+HudGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+HudGui.DisplayOrder = 2147483647
+HudGui.Parent = GuiParent
 
-    local GUI_NAME = "PumpkinCatches_Leaderboard_HUD"
-    local old = targetParent:FindFirstChild(GUI_NAME)
-    if old then pcall(old.Destroy, old) end
+local HudFrame = Instance.new("Frame")
+HudFrame.Name = "HudFrame"
+HudFrame.AutomaticSize = Enum.AutomaticSize.XY
+HudFrame.Size = UDim2.new(0, 0, 0, 0)
+HudFrame.Position = UDim2.new(0, 15, 0, 56)
+HudFrame.BackgroundColor3 = Color3.fromRGB(16, 18, 24)
+HudFrame.BackgroundTransparency = 0.08
+HudFrame.BorderSizePixel = 0
+HudFrame.Active = true
+HudFrame.ZIndex = 10
+HudFrame.Parent = HudGui
 
-    local sg = Instance.new("ScreenGui")
-    sg.Name = GUI_NAME
-    sg.ResetOnSpawn = false
-    sg.DisplayOrder = 2147483647
-    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    sg.IgnoreGuiInset = true
-    sg.Parent = targetParent
-    table.insert(CreatedGuis, sg)
+local hudPadding = Instance.new("UIPadding")
+hudPadding.PaddingTop = UDim.new(0, 8)
+hudPadding.PaddingBottom = UDim.new(0, 8)
+hudPadding.PaddingLeft = UDim.new(0, 12)
+hudPadding.PaddingRight = UDim.new(0, 12)
+hudPadding.Parent = HudFrame
 
-    local body = Instance.new("TextLabel")
-    body.Name = "LeaderboardText"
-    body.AutomaticSize = Enum.AutomaticSize.XY
-    body.Size = UDim2.new(0, 0, 0, 0)
-    body.AnchorPoint = Vector2.new(0, 0)
-    body.Position = UDim2.new(0, 14, 0, 56)
-    body.BackgroundTransparency = 1
-    body.Text = "Đang tải...\nFPS: --"
-    body.Font = Enum.Font.GothamBlack
-    body.TextSize = 14
-    body.LineHeight = 1.2
-    body.TextColor3 = Color3.fromRGB(255, 255, 255)
-    body.TextXAlignment = Enum.TextXAlignment.Left
-    body.TextYAlignment = Enum.TextYAlignment.Top
-    body.ZIndex = 1000000
-    body.Active = true
-    body.Parent = sg
+local hudCorner = Instance.new("UICorner")
+hudCorner.CornerRadius = UDim.new(0, 8)
+hudCorner.Parent = HudFrame
 
-    local textStroke = Instance.new("UIStroke")
-    textStroke.Color = Color3.fromRGB(0, 0, 0)
-    textStroke.Thickness = 1.6
-    textStroke.Transparency = 0.2
-    textStroke.Parent = body
+local hudStroke = Instance.new("UIStroke")
+hudStroke.Color = Color3.fromRGB(0, 204, 255)
+hudStroke.Thickness = 1.5
+hudStroke.Parent = HudFrame
 
-    MakeDraggable(body)
+local HudText = Instance.new("TextLabel")
+HudText.Name = "HudText"
+HudText.AutomaticSize = Enum.AutomaticSize.XY
+HudText.Size = UDim2.new(0, 0, 0, 0)
+HudText.BackgroundTransparency = 1
+HudText.Font = Enum.Font.GothamBold
+HudText.TextSize = 13
+HudText.LineHeight = 1.25
+HudText.TextColor3 = Color3.fromRGB(245, 248, 252)
+HudText.TextXAlignment = Enum.TextXAlignment.Left
+HudText.TextYAlignment = Enum.TextYAlignment.Top
+HudText.Text = "Đang tải...\nUnranked | 0\nFPS: --"
+HudText.ZIndex = 11
+HudText.Parent = HudFrame
 
-    local lastLbFetch = 0
-    local cachedData = GetLeaderboardData()
-    local lastText = ""
+MakeDraggable(HudFrame)
 
-    local frameCount = 0
-    local lastFpsUpdate = os.clock()
-    local currentFps = 0
+local frameCount = 0
+local lastFpsClock = os.clock()
+local currentFps = 0
 
-    local function Render()
-        local now = os.clock()
-        frameCount += 1
+local lastLbFetch = 0
+local cachedLb = GetLeaderboardData()
+local lastRenderedText = ""
 
-        local hue = (now * 0.25) % 1
-        body.TextColor3 = Color3.fromHSV(hue, 0.85, 1)
+local function UpdateHud()
+    local now = os.clock()
+    frameCount += 1
 
-        local fpsElapsed = now - lastFpsUpdate
-        if fpsElapsed >= 0.5 then
-            currentFps = math.floor((frameCount / fpsElapsed) + 0.5)
-            frameCount = 0
-            lastFpsUpdate = now
-        end
+    local fpsElapsed = now - lastFpsClock
+    if fpsElapsed >= 0.5 then
+        currentFps = math.floor((frameCount / fpsElapsed) + 0.5)
+        frameCount = 0
+        lastFpsClock = now
+    end
 
-        if (now - lastLbFetch) >= 0.35 then
-            lastLbFetch = now
-            cachedData = GetLeaderboardData()
-        end
+    if (now - lastLbFetch) >= 0.35 then
+        lastLbFetch = now
+        cachedLb = GetLeaderboardData()
+    end
 
-        local rankStr = cachedData.rank and ("#" .. FormatCommas(cachedData.rank)) or "Unranked"
-        local scoreStr = FormatCommas(cachedData.score)
-        local nextText = rankStr .. " | " .. scoreStr .. "\nFPS: " .. tostring(currentFps)
+    local accName = (LocalPlayer and LocalPlayer.Name) or "Unknown"
+    local rankStr = cachedLb.rank and ("#" .. FormatCommas(cachedLb.rank)) or "Unranked"
+    local scoreStr = FormatCommas(cachedLb.score)
 
-        if nextText ~= lastText then
-            lastText = nextText
-            body.Text = nextText
+    local nextText = table.concat({
+        accName,
+        rankStr .. " | " .. scoreStr,
+        "FPS: " .. tostring(currentFps),
+    }, "\n")
+
+    if nextText ~= lastRenderedText then
+        lastRenderedText = nextText
+        HudText.Text = nextText
+    end
+end
+
+UpdateHud()
+RunService.Heartbeat:Connect(function()
+    if not HudGui.Parent then
+        return
+    end
+    pcall(UpdateHud)
+end)
+
+-- ==========================================
+-- XOÁ ĐỒ HOẠ (GIỮ VA CHẠM ĐỨNG / DI CHUYỂN)
+-- ==========================================
+pcall(function()
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 1e9
+    Lighting.Brightness = 0
+    Lighting.Technology = Enum.Technology.Compatibility
+    for _, v in ipairs(Lighting:GetChildren()) do
+        if v:IsA("PostEffect") or v:IsA("Atmosphere") or v:IsA("Sky") then
+            v:Destroy()
         end
     end
 
-    Render()
-    Bind(RunService.Heartbeat, function()
-        if not Config.Running or not sg.Parent then return end
-        pcall(Render)
-    end)
+    if settings and settings().Rendering then
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    end
+
+    local terrain = workspace:FindFirstChildOfClass("Terrain")
+    if terrain then
+        terrain.WaterWaveSize = 0
+        terrain.WaterWaveSpeed = 0
+        for _, child in ipairs(terrain:GetChildren()) do
+            if child:IsA("Clouds") then
+                child:Destroy()
+            end
+        end
+    end
+end)
+
+local EFFECT_CLASSES = {
+    ParticleEmitter = true,
+    Trail = true,
+    Sparkles = true,
+    Smoke = true,
+    Fire = true,
+    Beam = true,
+}
+
+local function isCharPart(inst)
+    local char = LocalPlayer.Character
+    return char and inst:IsDescendantOf(char)
 end
 
--- ============================================================================
--- 3. XÓA SẠCH MỌI HIỆU ỨNG TOÀN GAME (EMIT, PARTICLE, LIGHT, BILLBOARDGUI)
--- ============================================================================
-local function SetupGlobalEffectBlocker()
-    if not Config.BlockAllEffects then return end
+local function optimizeInstance(v)
+    if v:GetAttribute("XT_Opt") then
+        return
+    end
+    v:SetAttribute("XT_Opt", true)
 
-    local fnFolder = Library and Library:FindFirstChild("Functions")
-    if fnFolder then
-        for _, name in ipairs({ "Emit", "EmitFast", "EmitOne" }) do
-            local mod = fnFolder:FindFirstChild(name)
-            if mod then
-                local ok, fn = pcall(require, mod)
-                if ok and type(fn) == "function" and type(hookfunction) == "function" then
-                    pcall(hookfunction, fn, function() end)
+    if v:IsA("BasePart") and not v:IsA("Terrain") then
+        v.CastShadow = false
+        v.Material = Enum.Material.SmoothPlastic
+        v.Reflectance = 0
+        if v:IsA("MeshPart") then
+            v.TextureID = ""
+        end
+        if not isCharPart(v) then
+            v.LocalTransparencyModifier = 1
+        end
+    elseif EFFECT_CLASSES[v.ClassName] then
+        v.Enabled = false
+    elseif v:IsA("PointLight") or v:IsA("SpotLight") or v:IsA("SurfaceLight") then
+        v.Enabled = false
+    elseif v:IsA("Decal") or v:IsA("Texture") then
+        v.Transparency = 1
+    elseif v:IsA("Highlight") or v:IsA("BillboardGui") then
+        if not isCharPart(v) then
+            v:Destroy()
+        end
+    end
+end
+
+task.spawn(function()
+    local desc = workspace:GetDescendants()
+    for i = 1, #desc do
+        pcall(optimizeInstance, desc[i])
+        if i % 500 == 0 then
+            task.wait()
+        end
+    end
+end)
+
+local pendingQueue = {}
+workspace.DescendantAdded:Connect(function(inst)
+    table.insert(pendingQueue, inst)
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.3)
+        local count = #pendingQueue
+        if count > 0 then
+            local batch = table.move(pendingQueue, 1, count, 1, table.create(count))
+            table.clear(pendingQueue)
+            for i = 1, count do
+                pcall(optimizeInstance, batch[i])
+                if i % 400 == 0 then
+                    task.wait()
+                end
+            end
+        end
+    end
+end)
+
+-- ==========================================
+-- HOOK MODULE HALLOWEEN GAMES (CHẠY 1 LẦN)
+-- ==========================================
+local hooksInstalled = false
+local function installOptimizationHooks()
+    if hooksInstalled then
+        return
+    end
+    local lib = ReplicatedStorage:FindFirstChild("Library")
+    local clientLib = lib and lib:FindFirstChild("Client")
+    local hgCmds = clientLib and clientLib:FindFirstChild("HalloweenGamesCmds")
+    if not hgCmds then
+        return
+    end
+
+    hooksInstalled = true
+
+    local fxScript = hgCmds:FindFirstChild("Fx")
+    if fxScript then
+        local okFx, fxMod = pcall(require, fxScript)
+        if okFx and type(fxMod) == "table" then
+            for _, fnName in ipairs({ "Burst", "Celebrate", "Through", "RoundStart", "Countdown", "Poof" }) do
+                if type(fxMod[fnName]) == "function" then
+                    fxMod[fnName] = function() end
+                end
+            end
+            if type(fxMod.Emitter) == "function" then
+                local origEmitter = fxMod.Emitter
+                fxMod.Emitter = function(...)
+                    local em = origEmitter(...)
+                    if typeof(em) == "Instance" and em:IsA("ParticleEmitter") then
+                        em.Enabled = false
+                        em.Rate = 0
+                    end
+                    return em
                 end
             end
         end
     end
 
-    for _, d in ipairs(Workspace:GetDescendants()) do
-        if EffectClasses[d.ClassName] then
-            DestroyEffectOrHide(d, true)
+    local cbScript = clientLib:FindFirstChild("CurrencyBurst")
+    if cbScript then
+        local okCb, cbMod = pcall(require, cbScript)
+        if okCb and type(cbMod) == "table" and type(cbMod.Play) == "function" then
+            cbMod.Play = function()
+                return 0
+            end
         end
     end
 
-    Bind(Workspace.DescendantAdded, function(d)
-        if Config.Running and EffectClasses[d.ClassName] then
-            task.defer(DestroyEffectOrHide, d, true)
-        end
-    end)
-
-    if Workspace.CurrentCamera then
-        Bind(Workspace.CurrentCamera.DescendantAdded, function(d)
-            if Config.Running and EffectClasses[d.ClassName] then
-                task.defer(DestroyEffectOrHide, d, true)
+    local rigsScript = hgCmds:FindFirstChild("Rigs")
+    if rigsScript then
+        local okRigs, rigsMod = pcall(require, rigsScript)
+        if okRigs and type(rigsMod) == "table" then
+            if type(rigsMod.Update) == "function" then
+                rigsMod.Update = function(_, model, cf)
+                    if model and model.PrimaryPart and typeof(cf) == "CFrame" then
+                        model.PrimaryPart.CFrame = cf * CFrame.new(0, 3, 0)
+                    end
+                end
             end
-        end)
-    end
-
-    local pGui = LocalPlayer:FindFirstChild("PlayerGui")
-    if pGui then
-        for _, d in ipairs(pGui:GetDescendants()) do
-            if d:IsA("BillboardGui") or d:IsA("ParticleEmitter") then
-                pcall(d.Destroy, d)
+            if type(rigsMod.Poof) == "function" then
+                rigsMod.Poof = function() end
             end
         end
-        Bind(pGui.DescendantAdded, function(d)
-            if Config.Running and (d:IsA("BillboardGui") or d:IsA("ParticleEmitter")) then
-                task.defer(function()
-                    pcall(d.Destroy, d)
-                end)
-            end
-        end)
     end
 end
 
--- ============================================================================
--- 4. ẨN MAP / PUMPKIN ISLANDS / BÍ / PET / BREAKABLE + DỌN RAM NGOÀI EVENT
--- ============================================================================
-local UnusedThingsFolders = {
-    "TowerDefenseMaps", "TowerDefenseEnemies", "TowerDefenseTowers", "TowerDefenseProjectiles",
-    "FarmEggs", "EventFishingSpots", "Boats", "Ski Chairs",
-    "Booths", "Hoverboards", "MasteryCapes", "AnimatedCards", "CardPacks",
-    "BlockWorlds", "ExclusiveEggs", "ExclusiveEggPets",
+-- ==========================================
+-- DỌN RÁC ĐỊNH KỲ (GIỮ SÀN & VA CHẠM)
+-- ==========================================
+local THINGS_BLOAT_FOLDERS = {
+    "RenderedEggs",
+    "CustomEggs",
+    "VFX",
+    "Booths",
+    "Flags",
+    "Hoverboards",
+    "RandomEvents",
+    "Shinies",
+    "Ultimates",
 }
 
-local UnusedAssetsFolders = {
-    "Particles", "Billboards", "ExclusiveEggs", "HatchWarLuckyOrbs",
-    "TowerDefense", "AdminAbuse", "WelcomeBack",
+local WORLD_BLOAT_NAMES = {
+    "GREYBOX_WIP",
+    "PSX Hall",
 }
 
-local UnusedDirectoryFolders = {
-    "CardItems", "Hoverboards", "Booths", "Boats",
-    "TowerDefenseTowers", "FarmingAttributes",
-    "FishingRods", "DigsiteOres", "DigsiteChests", "DigsiteBlocks",
-    "Shovels", "Seeds", "WateringCans", "SpinnyWheels", "VendingMachines",
+local HG_ACTIVE_DELETE_NAMES = {
+    "BREAK_ZONES",
+    "INTERACT",
 }
 
-local function CleanupNonEventRAM(initialRun)
-    if initialRun then
-        if Config.RemoveNonEventAreas then
-            for _, name in ipairs({ "PSX Portal", "PSX Hall" }) do
-                local obj = Workspace:FindFirstChild(name)
-                if obj then pcall(obj.Destroy, obj) end
-            end
-        end
+local LOBBY_MODELS_KEEP = {
+    Pad = true,
+    GROUND = true,
+    Board = true,
+    TeleportHide = true,
+    Billboard = true,
+    RemainingPlayers = true,
+    RemainingIcons = true,
+    Animations = true,
+}
 
-        if Config.CleanUnusedAssets then
-            local assets = ReplicatedStorage:FindFirstChild("Assets")
-            if assets then
-                for _, name in ipairs(UnusedAssetsFolders) do
-                    local f = assets:FindFirstChild(name)
-                    if f then pcall(f.Destroy, f) end
+local function simplifyVisualTree(root)
+    if not root then
+        return
+    end
+    for _, desc in ipairs(root:GetDescendants()) do
+        pcall(optimizeInstance, desc)
+    end
+end
+
+local function clearChildren(parent)
+    if not parent then
+        return
+    end
+    for _, child in ipairs(parent:GetChildren()) do
+        pcall(child.Destroy, child)
+    end
+end
+
+local function stepOptimization()
+    installOptimizationHooks()
+
+    clearChildren(workspace:FindFirstChild("__DEBRIS"))
+
+    local botsFolder = workspace:FindFirstChild("HalloweenGamesBots")
+    if botsFolder then
+        for _, botModel in ipairs(botsFolder:GetChildren()) do
+            for _, child in ipairs(botModel:GetChildren()) do
+                if child:IsA("BasePart") then
+                    child.Transparency = 1
+                    child.CastShadow = false
+                else
+                    pcall(child.Destroy, child)
                 end
             end
         end
+    end
 
-        if Config.CleanUnusedDirectory then
-            local dir = ReplicatedStorage:FindFirstChild("__DIRECTORY")
-            if dir then
-                for _, name in ipairs(UnusedDirectoryFolders) do
-                    local f = dir:FindFirstChild(name)
-                    if f then pcall(f.Destroy, f) end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            for _, desc in ipairs(plr.Character:GetDescendants()) do
+                if desc:IsA("BasePart") then
+                    desc.Transparency = 1
+                    desc.CastShadow = false
+                elseif desc:IsA("Decal") or desc:IsA("Texture") then
+                    desc.Transparency = 1
+                elseif desc:IsA("Accessory") or desc:IsA("Clothing") or desc:IsA("ShirtGraphic") or desc:IsA("CharacterMesh") or desc:IsA("BillboardGui") then
+                    pcall(desc.Destroy, desc)
+                elseif EFFECT_CLASSES[desc.ClassName] then
+                    desc.Enabled = false
                 end
             end
         end
     end
 
-    local things = Workspace:FindFirstChild("__THINGS")
-    if initialRun and Config.CleanUnusedThingsFolders and things then
-        for _, name in ipairs(UnusedThingsFolders) do
-            local f = things:FindFirstChild(name)
-            if f then pcall(f.Destroy, f) end
-        end
-    end
-
-    if Config.ClearDebrisAndVFX then
-        local debris = Workspace:FindFirstChild("__DEBRIS")
-        if debris then
-            for _, c in ipairs(debris:GetChildren()) do
-                pcall(c.Destroy, c)
-            end
-        end
-
-        local vfx = things and things:FindFirstChild("VFX")
-        if vfx then
-            for _, c in ipairs(vfx:GetChildren()) do
-                pcall(c.Destroy, c)
-            end
-        end
-    end
-end
-
-local function StripOtherPlayerChar(char)
-    if not Config.StripOtherPlayers or not char or char == LocalPlayer.Character then return end
-    for _, d in ipairs(char:GetDescendants()) do
-        if d:IsA("Accessory") or d:IsA("Shirt") or d:IsA("Pants")
-            or d:IsA("ShirtGraphic") or d:IsA("CharacterMesh")
-            or d:IsA("ParticleEmitter") or d:IsA("Animator")
-        then
-            pcall(d.Destroy, d)
-        elseif d:IsA("BasePart") then
-            pcall(function()
-                d.Transparency = 1
-                d.CastShadow = false
-                d.CanCollide = false
-                d.CanTouch = false
-                d.CanQuery = false
-            end)
-        end
-    end
-end
-
-local function HideFolderWithPhysics(folder)
-    if not folder then return end
-    HideTreeVisual(folder, true)
-    Bind(folder.DescendantAdded, function(d)
-        if Config.Running and Config.HideMapAndTycoons then
-            task.defer(DestroyEffectOrHide, d, true)
-        end
-    end)
-end
-
-local function IsDynamicPumpkinWorkspaceObj(obj)
-    if not obj or obj == Workspace.Terrain or obj:IsA("Camera") then return false end
-    if obj.Name == "__THINGS" or obj.Name == "__DEBRIS" or obj.Name == "Map" then return false end
-    if Players:GetPlayerFromCharacter(obj) then return false end
-    return obj:IsA("Folder") or obj:IsA("Model")
-end
-
-local function SetupPumpkinVisualHider()
-    -- 1. Ẩn Map chính, PumpkinTycoonIslands & các Folder/Model spawn thẳng vào Workspace
-    if Config.HideMapAndTycoons then
-        HideFolderWithPhysics(Workspace:FindFirstChild("Map"))
-        HideFolderWithPhysics(Workspace:FindFirstChild("PumpkinTycoonIslands"))
-
-        for _, child in ipairs(Workspace:GetChildren()) do
-            if IsDynamicPumpkinWorkspaceObj(child) then
-                HideFolderWithPhysics(child)
-            end
-        end
-        Bind(Workspace.ChildAdded, function(child)
-            if Config.Running and Config.HideMapAndTycoons and IsDynamicPumpkinWorkspaceObj(child) then
-                task.defer(HideFolderWithPhysics, child)
-            end
-        end)
-    end
-
-    local things = Workspace:FindFirstChild("__THINGS")
+    local things = workspace:FindFirstChild("__THINGS")
     if things then
-        -- 2. Ẩn Tycoons, Plots, Instances & __INSTANCE_CONTAINER (giữ vật lý & Raycast)
-        if Config.HideMapAndTycoons then
-            for _, fName in ipairs({ "Tycoons", "Plots", "Instances", "__INSTANCE_CONTAINER" }) do
-                HideFolderWithPhysics(things:FindFirstChild(fName))
+        for _, folderName in ipairs(THINGS_BLOAT_FOLDERS) do
+            clearChildren(things:FindFirstChild(folderName))
+        end
+    end
+
+    for _, name in ipairs(WORLD_BLOAT_NAMES) do
+        local obj = workspace:FindFirstChild(name)
+        if obj then
+            pcall(obj.Destroy, obj)
+        end
+    end
+
+    local activeModel = things
+        and things:FindFirstChild("__INSTANCE_CONTAINER")
+        and things.__INSTANCE_CONTAINER:FindFirstChild("Active")
+        and things.__INSTANCE_CONTAINER.Active:FindFirstChild("HalloweenGames")
+
+    if activeModel then
+        for _, delName in ipairs(HG_ACTIVE_DELETE_NAMES) do
+            local target = activeModel:FindFirstChild(delName)
+            if target then
+                pcall(target.Destroy, target)
             end
         end
-
-        -- 3. Ẩn Pets (vẫn giữ CustomPet/PlayerPet hoạt động bình thường)
-        local petsFolder = things:FindFirstChild("Pets")
-        if Config.HidePets and petsFolder then
-            HideTreeVisual(petsFolder, false)
-            Bind(petsFolder.DescendantAdded, function(d)
-                if Config.Running and Config.HidePets then
-                    task.defer(DestroyEffectOrHide, d, false)
-                end
-            end)
+        local hub = activeModel:FindFirstChild("Hub")
+        if hub then
+            local props = hub:FindFirstChild("Props")
+            if props then
+                pcall(props.Destroy, props)
+            end
+            simplifyVisualTree(hub)
         end
-
-        -- 4. Ẩn Breakables (CHỈ ẨN, KHÔNG DESTROY -> vẫn farm bình thường)
-        local breakablesFolder = things:FindFirstChild("Breakables")
-        if Config.HideBreakables and breakablesFolder then
-            HideTreeVisual(breakablesFolder, false)
-            Bind(breakablesFolder.DescendantAdded, function(d)
-                if Config.Running and Config.HideBreakables then
-                    task.defer(DestroyEffectOrHide, d, false)
-                end
-            end)
-        end
+        simplifyVisualTree(activeModel:FindFirstChild("ZONE_GROUND"))
+        simplifyVisualTree(activeModel:FindFirstChild("ArenaSlots"))
     end
 
-    -- 5. Dọn nhân vật người chơi khác
-    if Config.StripOtherPlayers then
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer then
-                if plr.Character then task.defer(StripOtherPlayerChar, plr.Character) end
-                Bind(plr.CharacterAdded, function(c)
-                    if Config.Running then task.defer(StripOtherPlayerChar, c) end
-                end)
+    local models = workspace:FindFirstChild("Models")
+    local netFolder = ReplicatedStorage:FindFirstChild("Network")
+    if models and netFolder and netFolder:FindFirstChild("RequestRegister") then
+        for _, child in ipairs(models:GetChildren()) do
+            if not LOBBY_MODELS_KEEP[child.Name] then
+                pcall(child.Destroy, child)
             end
         end
-        Bind(Players.PlayerAdded, function(plr)
-            if plr ~= LocalPlayer then
-                Bind(plr.CharacterAdded, function(c)
-                    if Config.Running then task.defer(StripOtherPlayerChar, c) end
-                end)
-            end
-        end)
+        simplifyVisualTree(models:FindFirstChild("Pad"))
+        simplifyVisualTree(models:FindFirstChild("GROUND"))
     end
 end
 
--- ============================================================================
--- 5. AUTO COLLECT & HIDE ORB / LOOTBAG (CHUẨN ORBCMDS)
--- ============================================================================
-local function InstallOrbRenderStub()
-    local OrbClass = Modules.OrbClass
-    if (not Config.HideOrb and not Config.HideLootbag) or type(OrbClass) ~= "table" then return end
-    if rawget(OrbClass, "__orbHideStub") then return end
-
-    local dummyFn = function() end
-    local mt = {
-        __index = {
-            RenderStepped = function(self)
-                if self._destroyed then return false end
-                self._collected = true
-                return false
-            end,
-            Destroy = function(self) self._destroyed = true end,
-            RenderParticles = dummyFn,
-            Combine = function() return false end,
-            Collect = function(self) self._collected = true end,
-        },
-    }
-
-    local function stubNew(id)
-        return setmetatable({
-            _id = id,
-            _destroyed = false,
-            _collected = true,
-            _combinedIds = {},
-        }, mt)
-    end
-
-    pcall(function()
-        if type(hookfunction) == "function" and type(OrbClass.new) == "function" then
-            hookfunction(OrbClass.new, stubNew)
-        else
-            local setro = env.setreadonly or setreadonly
-            if type(setro) == "function" then pcall(setro, OrbClass, false) end
-            OrbClass.new = stubNew
-        end
-        rawset(OrbClass, "__orbHideStub", true)
-    end)
-end
-
-local function FireCollectOrbs(ids)
-    if #ids == 0 then return end
-    local remote = NetworkFolder and NetworkFolder:FindFirstChild("Orbs: Collect")
-    if remote and remote:IsA("RemoteEvent") then
-        pcall(remote.FireServer, remote, ids)
-    elseif Modules.Network and type(Modules.Network.Fire) == "function" then
-        pcall(Modules.Network.Fire, "Orbs: Collect", ids)
-    end
-end
-
-local function SetupOrbLootbagListeners()
-    if Modules.Network and type(Modules.Network.Fired) == "function" then
-        local okSig, sig = pcall(Modules.Network.Fired, "Orbs: Create")
-        if okSig and sig then
-            Bind(sig, function(infoTable)
-                if not Config.Running or not Config.AutoCollectOrb or type(infoTable) ~= "table" then return end
-                local ids = {}
-                for k, v in pairs(infoTable) do
-                    local id = (type(v) == "table" and tonumber(v.id or v.uid)) or tonumber(v) or tonumber(k)
-                    if id then
-                        table.insert(ids, id)
-                    end
-                end
-                FireCollectOrbs(ids)
-            end)
-        end
-    end
-
-    local things = Workspace:FindFirstChild("__THINGS")
-    for _, folderName in ipairs({ "Orbs", "Lootbags" }) do
-        local folder = things and things:FindFirstChild(folderName)
-        if folder then
-            Bind(folder.ChildAdded, function(obj)
-                if not Config.Running or not obj then return end
-                if Config.HideOrb or Config.HideLootbag then
-                    pcall(HideTreeVisual, obj, false)
-                    task.defer(function()
-                        if obj and obj.Parent then
-                            pcall(obj.Destroy, obj)
-                        end
-                    end)
-                end
-            end)
-        end
-    end
-end
-
-local function SweepOrbsAndLootbags()
-    local things = Workspace:FindFirstChild("__THINGS")
-    if not things then return end
-
-    for _, folderName in ipairs({ "Orbs", "Lootbags" }) do
-        local folder = things:FindFirstChild(folderName)
-        if folder then
-            local children = folder:GetChildren()
-            if #children > 0 then
-                if Config.AutoCollectOrb then
-                    local ids = {}
-                    for _, o in ipairs(children) do
-                        local idNum = tonumber(o.Name)
-                            or tonumber(o:GetAttribute("OrbID"))
-                            or tonumber(o:GetAttribute("id"))
-                        if idNum then
-                            table.insert(ids, idNum)
-                        end
-                    end
-                    FireCollectOrbs(ids)
-                end
-                if Config.HideOrb or Config.HideLootbag then
-                    for _, o in ipairs(children) do
-                        pcall(HideTreeVisual, o, false)
-                        pcall(o.Destroy, o)
-                    end
-                end
-            end
-        end
-    end
-end
-
--- ============================================================================
--- 6. TẮT TIẾN TRÌNH NGẦM (CẮT PUMPKINFX & TURKEYFX, GIỮ HUNT / FARM / HATCH)
--- ============================================================================
-local BlacklistPatterns = {
-    "PumpkinTycoonCmds.PumpkinFx",
-    "PumpkinTycoonCmds.TurkeyFx",
-    "DoodleBattleCmds",
-    "EventFishingCmds",
-    "BoothCmds",
-    "PetDisplay",
-    "PetRendering",
-    "RagdollCmds",
-    "WingsCmds",
-    "HoverboardCmds",
-    "WorldFX",
-    "GUIFX",
-    "Audio",
-    "MusicCmds",
-    "TabController",
-    "InfoOverlay",
-    "NotificationCmds",
-    "WelcomeBackCinematic",
-    "ExclusiveEggCmds",
-    "GargantuanHatch",
-    "VariantTileFX",
-    "TileAnimationDriver",
-    "EventPassFX",
-    "LootboxAnimation",
-    "CardPackAnimation",
-}
-
-local WhitelistPatterns = {
-    "PumpkinTycoonCmds.Hunt",
-    "PumpkinTycoonCmds.Wild",
-    "PumpkinTycoonCmds.Nets",
-    "PumpkinTycoonCmds.Pumpkins",
-    "PumpkinTycoonCmds.AutoBreak",
-    "PumpkinTycoonCmds.Turkey",
-    "PumpkinTycoonCmds.Contests",
-    "LeaderboardCmds",
-    "BreakableFrontend",
-    "AutoFarmCmds",
-    "PlayerPet",
-    "CustomPet",
-    "PetNetworking",
-    "BulkMover",
-    "Parallel Pet Controller",
-    "OrbCmds",
-    "EggCmds",
-    "HatchingCmds",
-    "CustomEggsCmds",
-    "FruitCmds",
-    "CurrencyCmds",
-    "Network",
-    "Save",
-    "GoalCmds",
-    "PlayerModule",
-}
-
-local function GetScriptPathFromFunc(fn)
-    if type(fn) ~= "function" then return nil end
-    local ok, fnEnv = pcall(getfenv, fn)
-    if ok and type(fnEnv) == "table" and typeof(fnEnv.script) == "Instance" then
-        return fnEnv.script:GetFullName()
-    end
-    if debug and type(debug.info) == "function" then
-        local okS, src = pcall(debug.info, fn, "s")
-        if okS and type(src) == "string" then
-            return src
-        end
-    end
-    return nil
-end
-
-local function MatchesAny(str, list)
-    for _, pat in ipairs(list) do
-        if string.find(str, pat, 1, true) then
-            return true
-        end
-    end
-    return false
-end
-
-local function DisableDeepBackgroundWork()
-    local disabledCount = 0
-
-    if Config.DisableBackgroundLoops and type(getconnections) == "function" then
-        for _, signal in ipairs({ RunService.RenderStepped, RunService.Heartbeat, RunService.Stepped }) do
-            local ok, conns = pcall(getconnections, signal)
-            if ok and type(conns) == "table" then
-                for _, conn in ipairs(conns) do
-                    if conn and conn.Function and type(conn.Disable) == "function" then
-                        local srcPath = GetScriptPathFromFunc(conn.Function)
-                        if srcPath and not MatchesAny(srcPath, WhitelistPatterns) then
-                            if MatchesAny(srcPath, BlacklistPatterns) then
-                                if pcall(conn.Disable, conn) then
-                                    disabledCount += 1
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    if Config.DisableCustomPetSerialFX and type(getgc) == "function" and type(hookfunction) == "function" then
-        pcall(function()
-            for _, v in ipairs(getgc(false)) do
-                if type(v) == "function" and debug and type(debug.info) == "function" then
-                    local okN, fnName = pcall(debug.info, v, "n")
-                    local okS, fnSrc = pcall(debug.info, v, "s")
-                    if okN and fnName == "processSerialFX"
-                        and okS and type(fnSrc) == "string"
-                        and string.find(fnSrc, "CustomPet", 1, true)
-                    then
-                        hookfunction(v, function() end)
-                        break
-                    end
-                end
-            end
-        end)
-    end
-
-    if Config.DisableFxNetworkEvents and type(getconnections) == "function" and NetworkFolder then
-        for _, rName in ipairs({
-            "Eggs_PlayOpenAnimation",
-            "Exclusive Eggs: Animation",
-            "Lootbox: Animation",
-            "Chat Msg Hatches Tab",
-            "Breakables_Bonus",
-        }) do
-            local remote = NetworkFolder:FindFirstChild(rName)
-            if remote and remote:IsA("RemoteEvent") then
-                for _, conn in ipairs(getconnections(remote.OnClientEvent)) do
-                    pcall(conn.Disable, conn)
-                end
-            end
-        end
-    end
-
-    pcall(collectgarbage, "collect")
-    print(("[PS99 PumpkinTycoon Optimizer] Đã tắt %d tiến trình ngầm (giữ Hunt/Farm/Hatch/HUD)."):format(disabledCount))
-end
-
--- ============================================================================
--- KHỞI CHẠY HỆ THỐNG
--- ============================================================================
-ApplyGamePotatoMode()
-ApplyEngineAndLighting()
-Create3DRenderToggleUI()
-CreateLeftRainbowHud()
-CleanupNonEventRAM(true)
-SetupGlobalEffectBlocker()
-SetupPumpkinVisualHider()
-InstallOrbRenderStub()
-SetupOrbLootbagListeners()
-SweepOrbsAndLootbags()
-DisableDeepBackgroundWork()
-
--- Quét dọn Orb/Lootbag nhanh
 task.spawn(function()
-    while Config.Running do
-        pcall(SweepOrbsAndLootbags)
-        task.wait(Config.OrbSweepInterval or 0.5)
-    end
-end)
-
--- Giữ PotatoMode & dọn __DEBRIS / VFX định kỳ
-task.spawn(function()
-    while Config.Running do
-        ApplyGamePotatoMode()
-        if Config.ClearDebrisAndVFX then
-            CleanupNonEventRAM(false)
-        end
-        task.wait(Config.SweepInterval or 5.0)
-    end
-end)
-
--- Dọn RAM Lua định kỳ (chống tăng RAM khi tele nhiều)
-task.spawn(function()
-    while Config.Running do
-        task.wait(Config.GarbageCollectInterval or 30)
-        if not Config.Running then break end
-        pcall(collectgarbage, "collect")
+    while true do
+        pcall(stepOptimization)
+        task.wait(3)
     end
 end)
