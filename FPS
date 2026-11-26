@@ -35,7 +35,7 @@ local Config = {
 
     -- 1. Tối ưu có sẵn & Engine / FPS
     EnableGamePotatoMode = true,
-    TargetFPS = 20,                    -- Khuyên dùng 15-20 khi Auto Hunt tele liên tục (0 = không giới hạn)
+    TargetFPS = 15,                    -- Khuyên dùng 15-20 khi Auto Hunt tele liên tục (0 = không giới hạn)
     LowestRenderQuality = true,
     Disable3DRendering = false,        -- Bật/tắt trực tiếp bằng nút nổi trên màn hình
     OptimizeLightingAndTerrain = true,
