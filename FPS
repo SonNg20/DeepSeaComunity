@@ -1,4 +1,4 @@
--- XUANTAM | PET SIM 99 FIX LAG + SEPARATE WHITE SCREEN + SINGLE HUD
+-- XUANTAM | PET SIM 99 FIX LAG + WHITE SCREEN & 3D RENDER + SINGLE HUD
 if getgenv().XuantamPS99FixLoaded then
     return
 end
@@ -41,15 +41,14 @@ for _, name in ipairs({ "XuantamFixLagUI", "XuantamToggleUI", "XuantamWhiteScree
 end
 
 -- ==========================================
--- FUNCTION RIÊNG: BẬT / TẮT MÀN HÌNH TRẮNG
--- (Hoàn toàn độc lập, không ảnh hưởng đến GUI HUD)
+-- FUNCTION RIÊNG 1: BẬT / TẮT MÀN HÌNH TRẮNG
 -- ==========================================
 local WhiteScreenGui = Instance.new("ScreenGui")
 WhiteScreenGui.Name = "XuantamWhiteScreen"
 WhiteScreenGui.ResetOnSpawn = false
 WhiteScreenGui.IgnoreGuiInset = true
 WhiteScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-WhiteScreenGui.DisplayOrder = 1000 -- Nằm dưới HudGui (2147483647)
+WhiteScreenGui.DisplayOrder = 1000
 WhiteScreenGui.Enabled = true
 WhiteScreenGui.Parent = GuiParent
 
@@ -70,20 +69,46 @@ local function SetWhiteScreen(state)
     else
         isWhiteScreenEnabled = not isWhiteScreenEnabled
     end
-
     WhiteScreenGui.Enabled = isWhiteScreenEnabled
-    pcall(function()
-        RunService:Set3dRenderingEnabled(not isWhiteScreenEnabled)
-    end)
-
     return isWhiteScreenEnabled
 end
 
--- Xuất ra global để gọi bật/tắt bất cứ lúc nào từ ngoài (SetWhiteScreen(true/false) hoặc SetWhiteScreen())
 getgenv().SetWhiteScreen = SetWhiteScreen
 
--- Khởi chạy mặc định: Bật màn trắng
-SetWhiteScreen(true)
+-- ==========================================
+-- FUNCTION RIÊNG 2: BẬT / TẮT DISABLE RENDER 3D
+-- ==========================================
+local isDisableRender3D = true
+local Toggle3DBtn = nil
+
+local function SetDisableRender3D(state)
+    if type(state) == "boolean" then
+        isDisableRender3D = state
+    else
+        isDisableRender3D = not isDisableRender3D
+    end
+
+    pcall(function()
+        RunService:Set3dRenderingEnabled(not isDisableRender3D)
+    end)
+
+    -- Đồng bộ ẩn/hiện màn trắng để nhìn thấy game khi bật lại Render 3D
+    SetWhiteScreen(isDisableRender3D)
+
+    if Toggle3DBtn then
+        if isDisableRender3D then
+            Toggle3DBtn.Text = "DisableRender3D: [BẬT]"
+            Toggle3DBtn.TextColor3 = Color3.fromRGB(0, 255, 120)
+        else
+            Toggle3DBtn.Text = "DisableRender3D: [TẮT]"
+            Toggle3DBtn.TextColor3 = Color3.fromRGB(255, 85, 85)
+        end
+    end
+
+    return isDisableRender3D
+end
+
+getgenv().SetDisableRender3D = SetDisableRender3D
 
 -- ==========================================
 -- ĐỌC DỮ LIỆU BẢNG XẾP HẠNG
@@ -199,7 +224,7 @@ local function MakeDraggable(guiObject)
 end
 
 -- ==========================================
--- 1 GUI DUY NHẤT: HIỂN THỊ TÊN / BXH|SCORE / FPS
+-- 1 GUI DUY NHẤT: HIỂN THỊ TÊN / BXH|SCORE / FPS + NÚT DISABLERENDER3D
 -- ==========================================
 local HudGui = Instance.new("ScreenGui")
 HudGui.Name = "XuantamFixLagUI"
@@ -221,6 +246,13 @@ HudFrame.Active = true
 HudFrame.ZIndex = 10
 HudFrame.Parent = HudGui
 
+local listLayout = Instance.new("UIListLayout")
+listLayout.FillDirection = Enum.FillDirection.Vertical
+listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Padding = UDim.new(0, 6)
+listLayout.Parent = HudFrame
+
 local hudPadding = Instance.new("UIPadding")
 hudPadding.PaddingTop = UDim.new(0, 8)
 hudPadding.PaddingBottom = UDim.new(0, 8)
@@ -239,6 +271,7 @@ hudStroke.Parent = HudFrame
 
 local HudText = Instance.new("TextLabel")
 HudText.Name = "HudText"
+HudText.LayoutOrder = 1
 HudText.AutomaticSize = Enum.AutomaticSize.XY
 HudText.Size = UDim2.new(0, 0, 0, 0)
 HudText.BackgroundTransparency = 1
@@ -252,7 +285,35 @@ HudText.Text = "Đang tải...\nUnranked | 0\nFPS: --"
 HudText.ZIndex = 11
 HudText.Parent = HudFrame
 
+Toggle3DBtn = Instance.new("TextButton")
+Toggle3DBtn.Name = "Toggle3DBtn"
+Toggle3DBtn.LayoutOrder = 2
+Toggle3DBtn.Size = UDim2.new(0, 165, 0, 26)
+Toggle3DBtn.BackgroundColor3 = Color3.fromRGB(28, 32, 42)
+Toggle3DBtn.BorderSizePixel = 0
+Toggle3DBtn.AutoButtonColor = true
+Toggle3DBtn.Font = Enum.Font.GothamBold
+Toggle3DBtn.TextSize = 11
+Toggle3DBtn.Text = "DisableRender3D: [BẬT]"
+Toggle3DBtn.TextColor3 = Color3.fromRGB(0, 255, 120)
+Toggle3DBtn.ZIndex = 12
+Toggle3DBtn.Parent = HudFrame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 5)
+btnCorner.Parent = Toggle3DBtn
+
+local btnStroke = Instance.new("UIStroke")
+btnStroke.Color = Color3.fromRGB(0, 180, 255)
+btnStroke.Thickness = 1
+btnStroke.Parent = Toggle3DBtn
+
+Toggle3DBtn.Activated:Connect(function()
+    SetDisableRender3D()
+end)
+
 MakeDraggable(HudFrame)
+SetDisableRender3D(true)
 
 local frameCount = 0
 local lastFpsClock = os.clock()
