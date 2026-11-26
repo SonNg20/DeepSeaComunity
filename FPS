@@ -1,10 +1,11 @@
 -- ============================================================================
--- PS99 OPTIMIZER - PUMPKINTYCOON EVENT (AUTO HUNT + TELEPORT NHIỀU)
+-- PS99 ULTIMATE OPTIMIZER - PUMPKINTYCOON (AUTO HUNT + FARM + HATCH + HUD)
 -- 1. POTATO MODE + ENGINE / FPS / LIGHTING / TERRAIN / SOUND / COREGUI
--- 2. XÓA SẠCH HIỆU ỨNG (PARTICLE, CONFETTI, LIGHT, BILLBOARDGUI, EMIT)
--- 3. ẨN MAP / TYCOONS / PLOTS / PET (GIỮ CANCOLLIDE & CANTOUCH ĐỂ TELE HUNT)
--- 4. AUTO COLLECT & HIDE ORB / LOOTBAG (CHUẨN ORBCMDS)
--- 5. TẮT PUMPKINFX, TURKEYFX, PROCESSSERIALFX & DỌN RAM (GIỮ LOGIC HUNT)
+-- 2. NÚT NỔI BẬT / TẮT 3D RENDER + HUD RANK PUMPKIN CATCHES & FPS (CẦU VỒNG)
+-- 3. XÓA SẠCH 100% HIỆU ỨNG (PARTICLE, CONFETTI, LIGHT, BILLBOARDGUI, EMIT)
+-- 4. ẨN MAP / PUMPKIN ISLANDS / BÍ / PET / BREAKABLE (GIỮ RAYCAST & FARM)
+-- 5. AUTO COLLECT & HIDE ORB / LOOTBAG (CHUẨN ORBCMDS)
+-- 6. TẮT PUMPKINFX, TURKEYFX, PROCESSSERIALFX & DỌN RAM ĐỊNH KỲ
 -- ============================================================================
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,6 +14,8 @@ local Lighting = game:GetService("Lighting")
 local SoundService = game:GetService("SoundService")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
 
 if not game:IsLoaded() then
     pcall(function() game.Loaded:Wait() end)
@@ -32,41 +35,48 @@ local Config = {
 
     -- 1. Tối ưu có sẵn & Engine / FPS
     EnableGamePotatoMode = true,
-    TargetFPS = 20,                    -- Khuyên dùng 20-30 khi Auto Hunt tele liên tục (0 = không giới hạn)
+    TargetFPS = 20,                    -- Khuyên dùng 15-20 khi Auto Hunt tele liên tục (0 = không giới hạn)
     LowestRenderQuality = true,
-    Disable3DRendering = false,        -- true = tắt render 3D hoàn toàn (tiết kiệm GPU/CPU/RAM tối đa)
+    Disable3DRendering = false,        -- Bật/tắt trực tiếp bằng nút nổi trên màn hình
     OptimizeLightingAndTerrain = true,
     MuteAllSounds = true,
     HideDefaultCoreGui = true,         -- Tắt Chat, PlayerList, Backpack, Emotes & xóa ExperienceChat
 
-    -- 2. Ẩn hình ảnh & Xóa hiệu ứng (Vẫn giữ sàn, pad, hunt target)
-    HideMapAndTycoons = true,          -- Ẩn Map/Tycoons/Plots (GIỮ CanCollide & CanTouch để tele không rơi/lỗi pad)
-    HidePets = true,                   -- Ẩn model Pet (vẫn chạy & bắt/đánh bình thường)
+    -- 2. Giao diện tiện ích
+    Enable3DRenderToggle = true,       -- Nút bật/tắt 3D Render
+    EnableLeaderboardHUD = true,       -- HUD Rank PumpkinCatches + FPS (cầu vồng)
+
+    -- 3. Ẩn hình ảnh & Xóa hiệu ứng (Vẫn farm & tele Hunt bình thường)
+    HideMapAndTycoons = true,          -- Ẩn Map/PumpkinTycoonIslands/Bí/Plots (GIỮ Raycast/CanCollide/CanTouch)
+    HidePets = true,                   -- Ẩn model Pet (vẫn chạy & farm bình thường)
+    HideBreakables = true,             -- Ẩn model Breakable (KHÔNG Destroy -> vẫn farm bình thường)
     StripOtherPlayers = true,          -- Dọn phụ kiện, animation & ẩn nhân vật người chơi khác
-    BlockAllEffects = true,            -- Xóa ParticleEmitter, Beam, Trail, Light, BillboardGui, Emit
+    BlockAllEffects = true,            -- Xóa sạch ParticleEmitter, Confetti, Light, BillboardGui, Emit
 
-    -- 3. Dọn RAM (KHÔNG xóa PumpkinTycoonSections, Hunt, Plots, Tycoons, __INSTANCE_CONTAINER)
+    -- 4. Dọn RAM (GIỮ NGUYÊN PumpkinTycoonSections*, Hunt, Plots, Tycoons, Instances)
     ClearDebrisAndVFX = true,
-    RemoveNonEventAreas = true,        -- Xóa PSX Portal, PSX Hall (giữ PumpkinTycoonSections*)
-    CleanUnusedThingsFolders = true,   -- Chỉ xóa thư mục minigame ngoài event
-    CleanUnusedAssets = true,          -- Chỉ xóa Assets ngoài event (giữ Assets.PumpkinTycoon)
-    CleanUnusedDirectory = true,       -- Chỉ xóa __DIRECTORY ngoài event
+    RemoveNonEventAreas = true,        -- Xóa PSX Portal, PSX Hall
+    CleanUnusedThingsFolders = true,   -- Xóa thư mục minigame ngoài event/farm/hatch
+    CleanUnusedAssets = true,          -- Xóa Assets ngoài event/farm/hatch
+    CleanUnusedDirectory = true,       -- Xóa __DIRECTORY ngoài event/farm/hatch
 
-    -- 4. Auto Collect & Hide Orb / Lootbag
+    -- 5. Auto Collect & Hide Orb / Lootbag
     AutoCollectOrb = true,
     HideOrb = true,
     HideLootbag = true,
     OrbSweepInterval = 0.5,
 
-    -- 5. Tắt tiến trình chạy ngầm & Dọn RAM Lua
-    DisableBackgroundLoops = true,     -- Tắt PumpkinFx, TurkeyFx & module thừa (GIỮ Hunt, Wild, Nets, Pumpkins)
+    -- 6. Tắt tiến trình chạy ngầm & Dọn RAM Lua
+    DisableBackgroundLoops = true,     -- Tắt PumpkinFx, TurkeyFx & module thừa (GIỮ Hunt, Wild, Nets, Pumpkins, Farm, Hatch)
     DisableCustomPetSerialFX = true,
     DisableFxNetworkEvents = true,
-    GarbageCollectInterval = 45,
+    GarbageCollectInterval = 30,       -- Dọn RAM mỗi 30s để chống tăng RAM khi tele nhiều
     SweepInterval = 5.0,
 }
 
 local Connections = {}
+local CreatedGuis = {}
+
 local function Bind(sig, fn)
     if not sig then return nil end
     local ok, conn = pcall(function() return sig:Connect(fn) end)
@@ -83,9 +93,11 @@ env._PS99PumpkinOptStop = function()
         pcall(function() Connections[i]:Disconnect() end)
         Connections[i] = nil
     end
-    if Config.Disable3DRendering then
-        pcall(RunService.Set3dRenderingEnabled, RunService, true)
+    for i = #CreatedGuis, 1, -1 do
+        pcall(function() CreatedGuis[i]:Destroy() end)
+        CreatedGuis[i] = nil
     end
+    pcall(RunService.Set3dRenderingEnabled, RunService, true)
 end
 
 local Library = ReplicatedStorage:WaitForChild("Library", 30)
@@ -107,7 +119,19 @@ local Modules = {
     Variables = SafeRequire(Library, "Variables") or SafeRequire(Library, "Client", "Variables"),
     Network = SafeRequire(Library, "Client", "Network"),
     OrbClass = SafeRequire(Library, "Client", "OrbCmds", "Orb"),
+    LeaderboardCmds = SafeRequire(Library, "Client", "LeaderboardCmds"),
+    PumpkinContestsUtil = SafeRequire(Library, "Util", "PumpkinContestsUtil"),
 }
+
+local function GetGuiParent()
+    if type(gethui) == "function" then
+        local ok, ui = pcall(gethui)
+        if ok and ui then return ui end
+    end
+    local okCore = pcall(function() return CoreGui.Name end)
+    if okCore then return CoreGui end
+    return LocalPlayer:FindFirstChild("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 10)
+end
 
 -- ============================================================================
 -- HÀM XÓA HIỆU ỨNG & ẨN INSTANCE AN TOÀN
@@ -197,17 +221,14 @@ local function ApplyEngineAndLighting()
         end)
     end
 
-    if Config.Disable3DRendering then
-        pcall(RunService.Set3dRenderingEnabled, RunService, false)
-    end
+    pcall(RunService.Set3dRenderingEnabled, RunService, not Config.Disable3DRendering)
 
     if Config.HideDefaultCoreGui then
         pcall(function()
             StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
         end)
         pcall(function()
-            local coreGui = game:GetService("CoreGui")
-            local expChat = coreGui:FindFirstChild("ExperienceChat")
+            local expChat = CoreGui:FindFirstChild("ExperienceChat")
             if expChat then expChat:Destroy() end
         end)
     end
@@ -246,7 +267,244 @@ local function ApplyEngineAndLighting()
 end
 
 -- ============================================================================
--- 2. XÓA SẠCH MỌI HIỆU ỨNG TOÀN GAME
+-- 2A. NÚT BẬT / TẮT DISABLE 3D RENDERING (KÉO THẢ ĐƯỢC)
+-- ============================================================================
+local function Create3DRenderToggleUI()
+    if not Config.Enable3DRenderToggle then return end
+    local parentGui = GetGuiParent()
+    if not parentGui then return end
+
+    local old = parentGui:FindFirstChild("PS99_3DRenderToggle")
+    if old then pcall(old.Destroy, old) end
+
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "PS99_3DRenderToggle"
+    sg.ResetOnSpawn = false
+    sg.IgnoreGuiInset = true
+    sg.DisplayOrder = 999999
+    sg.Parent = parentGui
+    table.insert(CreatedGuis, sg)
+
+    local btn = Instance.new("TextButton")
+    btn.Name = "ToggleBtn"
+    btn.Size = UDim2.fromOffset(124, 34)
+    btn.Position = UDim2.new(0, 14, 0, 110)
+    btn.AutoButtonColor = true
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.BorderSizePixel = 0
+    btn.Active = true
+    btn.Draggable = true
+    btn.Parent = sg
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = btn
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 1.5
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Transparency = 0.65
+    stroke.Parent = btn
+
+    local function RefreshVisual()
+        if Config.Disable3DRendering then
+            btn.Text = "3D Render: OFF"
+            btn.BackgroundColor3 = Color3.fromRGB(190, 55, 55)
+        else
+            btn.Text = "3D Render: ON"
+            btn.BackgroundColor3 = Color3.fromRGB(45, 160, 85)
+        end
+    end
+
+    RefreshVisual()
+
+    Bind(btn.MouseButton1Click, function()
+        Config.Disable3DRendering = not Config.Disable3DRendering
+        pcall(RunService.Set3dRenderingEnabled, RunService, not Config.Disable3DRendering)
+        RefreshVisual()
+    end)
+end
+
+-- ============================================================================
+-- 2B. HUD LEADERBOARD PUMPKIN CATCHES + FPS (CHỮ CẦU VỒNG, KÉO THẢ ĐƯỢC)
+-- ============================================================================
+local function FormatCommas(value, fallback)
+    if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
+        return fallback or "0"
+    end
+    local digits = string.format("%.0f", math.floor(value))
+    return (digits:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", ""))
+end
+
+local function GetLeaderboardData(customBoardId)
+    if not Modules.LeaderboardCmds then
+        Modules.LeaderboardCmds = SafeRequire(Library, "Client", "LeaderboardCmds")
+    end
+    if not Modules.PumpkinContestsUtil then
+        Modules.PumpkinContestsUtil = SafeRequire(Library, "Util", "PumpkinContestsUtil")
+    end
+
+    local boardId = customBoardId
+        or (Modules.PumpkinContestsUtil and Modules.PumpkinContestsUtil.BOARD_ID)
+        or "PumpkinTycoonCatches"
+
+    local rank, score = nil, 0
+
+    if Modules.LeaderboardCmds and type(Modules.LeaderboardCmds.Get) == "function" then
+        local okGet, state = pcall(Modules.LeaderboardCmds.Get, boardId)
+        if okGet and type(state) == "table" then
+            local myData = type(state.LocalPlayer) == "table" and state.LocalPlayer or nil
+            if myData then
+                local r = tonumber(myData.GlobalRank)
+                if r and r >= 1 and r == r and r < math.huge then
+                    rank = math.floor(r)
+                end
+                local s = tonumber(myData.Score)
+                if s and s >= 0 and s == s and s < math.huge then
+                    score = math.floor(s)
+                end
+            end
+        end
+    end
+
+    return {
+        rank = rank,
+        score = score,
+    }
+end
+
+local function MakeDraggable(guiObject)
+    local dragging = false
+    local activeInput = nil
+    local dragStart = Vector2.zero
+    local startPos = guiObject.Position
+
+    Bind(guiObject.InputBegan, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch
+        then
+            dragging = true
+            activeInput = input
+            dragStart = Vector2.new(input.Position.X, input.Position.Y)
+            startPos = guiObject.Position
+        end
+    end)
+
+    Bind(UserInputService.InputChanged, function(input)
+        if not dragging or input ~= activeInput then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch
+        then
+            local delta = Vector2.new(input.Position.X, input.Position.Y) - dragStart
+            guiObject.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    Bind(UserInputService.InputEnded, function(input)
+        if input == activeInput then
+            dragging = false
+            activeInput = nil
+        end
+    end)
+end
+
+local function CreateLeftRainbowHud()
+    if not Config.EnableLeaderboardHUD then return end
+    local targetParent = GetGuiParent()
+    if not targetParent then return end
+
+    local GUI_NAME = "PumpkinCatches_Leaderboard_HUD"
+    local old = targetParent:FindFirstChild(GUI_NAME)
+    if old then pcall(old.Destroy, old) end
+
+    local sg = Instance.new("ScreenGui")
+    sg.Name = GUI_NAME
+    sg.ResetOnSpawn = false
+    sg.DisplayOrder = 2147483647
+    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    sg.IgnoreGuiInset = true
+    sg.Parent = targetParent
+    table.insert(CreatedGuis, sg)
+
+    local body = Instance.new("TextLabel")
+    body.Name = "LeaderboardText"
+    body.AutomaticSize = Enum.AutomaticSize.XY
+    body.Size = UDim2.new(0, 0, 0, 0)
+    body.AnchorPoint = Vector2.new(0, 0)
+    body.Position = UDim2.new(0, 14, 0, 56)
+    body.BackgroundTransparency = 1
+    body.Text = "Đang tải...\nFPS: --"
+    body.Font = Enum.Font.GothamBlack
+    body.TextSize = 14
+    body.LineHeight = 1.2
+    body.TextColor3 = Color3.fromRGB(255, 255, 255)
+    body.TextXAlignment = Enum.TextXAlignment.Left
+    body.TextYAlignment = Enum.TextYAlignment.Top
+    body.ZIndex = 1000000
+    body.Active = true
+    body.Parent = sg
+
+    local textStroke = Instance.new("UIStroke")
+    textStroke.Color = Color3.fromRGB(0, 0, 0)
+    textStroke.Thickness = 1.6
+    textStroke.Transparency = 0.2
+    textStroke.Parent = body
+
+    MakeDraggable(body)
+
+    local lastLbFetch = 0
+    local cachedData = GetLeaderboardData()
+    local lastText = ""
+
+    local frameCount = 0
+    local lastFpsUpdate = os.clock()
+    local currentFps = 0
+
+    local function Render()
+        local now = os.clock()
+        frameCount += 1
+
+        local hue = (now * 0.25) % 1
+        body.TextColor3 = Color3.fromHSV(hue, 0.85, 1)
+
+        local fpsElapsed = now - lastFpsUpdate
+        if fpsElapsed >= 0.5 then
+            currentFps = math.floor((frameCount / fpsElapsed) + 0.5)
+            frameCount = 0
+            lastFpsUpdate = now
+        end
+
+        if (now - lastLbFetch) >= 0.35 then
+            lastLbFetch = now
+            cachedData = GetLeaderboardData()
+        end
+
+        local rankStr = cachedData.rank and ("#" .. FormatCommas(cachedData.rank)) or "Unranked"
+        local scoreStr = FormatCommas(cachedData.score)
+        local nextText = rankStr .. " | " .. scoreStr .. "\nFPS: " .. tostring(currentFps)
+
+        if nextText ~= lastText then
+            lastText = nextText
+            body.Text = nextText
+        end
+    end
+
+    Render()
+    Bind(RunService.Heartbeat, function()
+        if not Config.Running or not sg.Parent then return end
+        pcall(Render)
+    end)
+end
+
+-- ============================================================================
+-- 3. XÓA SẠCH MỌI HIỆU ỨNG TOÀN GAME (EMIT, PARTICLE, LIGHT, BILLBOARDGUI)
 -- ============================================================================
 local function SetupGlobalEffectBlocker()
     if not Config.BlockAllEffects then return end
@@ -302,9 +560,8 @@ local function SetupGlobalEffectBlocker()
 end
 
 -- ============================================================================
--- 3. ẨN MAP/TYCOONS/PLOTS/PETS + DỌN RAM NGOÀI PUMPKIN TYCOON
+-- 4. ẨN MAP / PUMPKIN ISLANDS / BÍ / PET / BREAKABLE + DỌN RAM NGOÀI EVENT
 -- ============================================================================
--- LƯU Ý: Giữ nguyên Hunt, Plots, Tycoons, __INSTANCE_CONTAINER, PumpkinTycoonSections*
 local UnusedThingsFolders = {
     "TowerDefenseMaps", "TowerDefenseEnemies", "TowerDefenseTowers", "TowerDefenseProjectiles",
     "FarmEggs", "EventFishingSpots", "Boats", "Ski Chairs",
@@ -399,36 +656,51 @@ local function StripOtherPlayerChar(char)
     end
 end
 
+local function HideFolderWithPhysics(folder)
+    if not folder then return end
+    HideTreeVisual(folder, true)
+    Bind(folder.DescendantAdded, function(d)
+        if Config.Running and Config.HideMapAndTycoons then
+            task.defer(DestroyEffectOrHide, d, true)
+        end
+    end)
+end
+
+local function IsDynamicPumpkinWorkspaceObj(obj)
+    if not obj or obj == Workspace.Terrain or obj:IsA("Camera") then return false end
+    if obj.Name == "__THINGS" or obj.Name == "__DEBRIS" or obj.Name == "Map" then return false end
+    if Players:GetPlayerFromCharacter(obj) then return false end
+    return obj:IsA("Folder") or obj:IsA("Model")
+end
+
 local function SetupPumpkinVisualHider()
-    -- Ẩn Map nhưng GIỮ nguyên CanCollide & CanTouch (vì Auto Hunt tele rất nhiều)
-    local mapFolder = Workspace:FindFirstChild("Map")
-    if Config.HideMapAndTycoons and mapFolder then
-        HideTreeVisual(mapFolder, true)
-        Bind(mapFolder.DescendantAdded, function(d)
-            if Config.Running and Config.HideMapAndTycoons then
-                task.defer(DestroyEffectOrHide, d, true)
+    -- 1. Ẩn Map chính, PumpkinTycoonIslands & các Folder/Model spawn thẳng vào Workspace
+    if Config.HideMapAndTycoons then
+        HideFolderWithPhysics(Workspace:FindFirstChild("Map"))
+        HideFolderWithPhysics(Workspace:FindFirstChild("PumpkinTycoonIslands"))
+
+        for _, child in ipairs(Workspace:GetChildren()) do
+            if IsDynamicPumpkinWorkspaceObj(child) then
+                HideFolderWithPhysics(child)
+            end
+        end
+        Bind(Workspace.ChildAdded, function(child)
+            if Config.Running and Config.HideMapAndTycoons and IsDynamicPumpkinWorkspaceObj(child) then
+                task.defer(HideFolderWithPhysics, child)
             end
         end)
     end
 
     local things = Workspace:FindFirstChild("__THINGS")
     if things then
-        -- Ẩn Tycoons, Plots & __INSTANCE_CONTAINER nhưng GIỮ nguyên vật lý & touch
+        -- 2. Ẩn Tycoons, Plots, Instances & __INSTANCE_CONTAINER (giữ vật lý & Raycast)
         if Config.HideMapAndTycoons then
-            for _, fName in ipairs({ "Tycoons", "Plots", "__INSTANCE_CONTAINER" }) do
-                local f = things:FindFirstChild(fName)
-                if f then
-                    HideTreeVisual(f, true)
-                    Bind(f.DescendantAdded, function(d)
-                        if Config.Running and Config.HideMapAndTycoons then
-                            task.defer(DestroyEffectOrHide, d, true)
-                        end
-                    end)
-                end
+            for _, fName in ipairs({ "Tycoons", "Plots", "Instances", "__INSTANCE_CONTAINER" }) do
+                HideFolderWithPhysics(things:FindFirstChild(fName))
             end
         end
 
-        -- Ẩn Pets (vẫn giữ CustomPet/PlayerPet hoạt động bình thường)
+        -- 3. Ẩn Pets (vẫn giữ CustomPet/PlayerPet hoạt động bình thường)
         local petsFolder = things:FindFirstChild("Pets")
         if Config.HidePets and petsFolder then
             HideTreeVisual(petsFolder, false)
@@ -438,8 +710,20 @@ local function SetupPumpkinVisualHider()
                 end
             end)
         end
+
+        -- 4. Ẩn Breakables (CHỈ ẨN, KHÔNG DESTROY -> vẫn farm bình thường)
+        local breakablesFolder = things:FindFirstChild("Breakables")
+        if Config.HideBreakables and breakablesFolder then
+            HideTreeVisual(breakablesFolder, false)
+            Bind(breakablesFolder.DescendantAdded, function(d)
+                if Config.Running and Config.HideBreakables then
+                    task.defer(DestroyEffectOrHide, d, false)
+                end
+            end)
+        end
     end
 
+    -- 5. Dọn nhân vật người chơi khác
     if Config.StripOtherPlayers then
         for _, plr in ipairs(Players:GetPlayers()) do
             if plr ~= LocalPlayer then
@@ -460,7 +744,7 @@ local function SetupPumpkinVisualHider()
 end
 
 -- ============================================================================
--- 4. AUTO COLLECT & HIDE ORB / LOOTBAG
+-- 5. AUTO COLLECT & HIDE ORB / LOOTBAG (CHUẨN ORBCMDS)
 -- ============================================================================
 local function InstallOrbRenderStub()
     local OrbClass = Modules.OrbClass
@@ -583,11 +867,11 @@ local function SweepOrbsAndLootbags()
 end
 
 -- ============================================================================
--- 5. TẮT TIẾN TRÌNH NGẦM (CẮT PUMPKINFX & TURKEYFX, GIỮ HUNT / WILD / NETS)
+-- 6. TẮT TIẾN TRÌNH NGẦM (CẮT PUMPKINFX & TURKEYFX, GIỮ HUNT / FARM / HATCH)
 -- ============================================================================
 local BlacklistPatterns = {
-    "PumpkinTycoonCmds.PumpkinFx",     -- Thuần hiệu ứng bí ngô
-    "PumpkinTycoonCmds.TurkeyFx",      -- Thuần hiệu ứng turkey (4,253 dòng)
+    "PumpkinTycoonCmds.PumpkinFx",
+    "PumpkinTycoonCmds.TurkeyFx",
     "DoodleBattleCmds",
     "EventFishingCmds",
     "BoothCmds",
@@ -620,6 +904,8 @@ local WhitelistPatterns = {
     "PumpkinTycoonCmds.Pumpkins",
     "PumpkinTycoonCmds.AutoBreak",
     "PumpkinTycoonCmds.Turkey",
+    "PumpkinTycoonCmds.Contests",
+    "LeaderboardCmds",
     "BreakableFrontend",
     "AutoFarmCmds",
     "PlayerPet",
@@ -722,7 +1008,7 @@ local function DisableDeepBackgroundWork()
     end
 
     pcall(collectgarbage, "collect")
-    print(("[PS99 PumpkinTycoon Optimizer] Đã tắt %d tiến trình ngầm (giữ nguyên Hunt/Wild/Nets/Pets)."):format(disabledCount))
+    print(("[PS99 PumpkinTycoon Optimizer] Đã tắt %d tiến trình ngầm (giữ Hunt/Farm/Hatch/HUD)."):format(disabledCount))
 end
 
 -- ============================================================================
@@ -730,6 +1016,8 @@ end
 -- ============================================================================
 ApplyGamePotatoMode()
 ApplyEngineAndLighting()
+Create3DRenderToggleUI()
+CreateLeftRainbowHud()
 CleanupNonEventRAM(true)
 SetupGlobalEffectBlocker()
 SetupPumpkinVisualHider()
@@ -757,10 +1045,10 @@ task.spawn(function()
     end
 end)
 
--- Dọn RAM Lua định kỳ
+-- Dọn RAM Lua định kỳ (chống tăng RAM khi tele nhiều)
 task.spawn(function()
     while Config.Running do
-        task.wait(Config.GarbageCollectInterval or 45)
+        task.wait(Config.GarbageCollectInterval or 30)
         if not Config.Running then break end
         pcall(collectgarbage, "collect")
     end
